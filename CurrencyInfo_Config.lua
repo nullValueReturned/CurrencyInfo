@@ -66,12 +66,14 @@ local function EditBox(parent, w, h)
 end
 
 -- Dropdown using WoW's UIDropDownMenuTemplate.
--- options: array of { id, label }
+-- options:   array of { id, label }
 -- currentId: id of initial selection
--- onChange: function(option) called on selection change
-local function DropDown(parent, width, options, currentId, onChange)
+-- onChange:  function(option) called on selection change
+-- maxLines:  (optional) max visible rows before scrolling (~16px each)
+local function DropDown(parent, width, options, currentId, onChange, maxLines)
     local dd = CreateFrame("Frame", nil, parent, "UIDropDownMenuTemplate")
     UIDropDownMenu_SetWidth(dd, width)
+    if maxLines then UIDropDownMenu_SetMaxLines(dd, maxLines) end
 
     local function SetSelected(id)
         UIDropDownMenu_SetSelectedValue(dd, id)
@@ -346,7 +348,7 @@ function CI:BuildDisplaySettings(p)
     local fontDD = DropDown(p, 156, ns.GetFontOptions(), layout.fontFace, function(opt)
         layout.fontFace = opt.id
         CI:RefreshDisplay()
-    end)
+    end, 18)  -- ~300px max height (18 rows × 16px)
     fontDD:SetPoint("TOPLEFT", p, "TOPLEFT", 236, 2)
 
     local fsLbl = Label(p, "Font Size:", 11); fsLbl:SetPoint("TOPLEFT", p, "TOPLEFT", 422, 0); fsLbl:SetTextColor(0.85,0.85,0.85)
