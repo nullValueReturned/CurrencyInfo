@@ -60,6 +60,7 @@ local DB_DEFAULTS = {
 ns.CURRENCY_DEFAULTS = {
     id             = 0,
     customLabel    = "",
+    noLabel        = false,
     showIcon       = true,
     formatPreset   = "current_max",
     customTemplate = "{label}: {current} / {max}",
@@ -278,7 +279,7 @@ function CI:PopulateEntry(entry, currSettings, data)
         entry.text:SetPoint("LEFT", entry.frame, "LEFT", 0, 0)
     end
 
-    local label = (currSettings.customLabel ~= "" and currSettings.customLabel) or data.name
+    local label = currSettings.noLabel and "" or (currSettings.customLabel ~= "" and currSettings.customLabel) or data.name
     local template = GetTemplate(currSettings)
     local displayText = ApplyTemplate(template, {
         label     = label,

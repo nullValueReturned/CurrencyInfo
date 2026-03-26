@@ -430,15 +430,32 @@ function CI:BuildCurrencyRow(parent, index, currSettings)
     nameLbl:SetWordWrap(false)
 
     -- Custom label input
-    local labelBox = EditBox(row, COL_FMT - COL_LABEL - 6, 22)
+    local labelBox = EditBox(row, COL_FMT - COL_LABEL - 32, 22)
     labelBox:SetPoint("LEFT", row, "LEFT", COL_LABEL, 0)
     labelBox.editBox:SetText(currSettings.customLabel or "")
+    labelBox:SetAlpha(currSettings.noLabel and 0.35 or 1)
+    labelBox.editBox:SetEnabled(not currSettings.noLabel)
     local function SaveLabel(self)
         currSettings.customLabel = self:GetText()
         CI:RefreshDisplay()
     end
     labelBox.editBox:SetScript("OnEnterPressed", function(self) SaveLabel(self); self:ClearFocus() end)
     labelBox.editBox:SetScript("OnEditFocusLost", SaveLabel)
+
+    -- "None" checkbox — hide the label entirely
+    local noLabelCb = Checkbox(row, currSettings.noLabel, nil, function(checked)
+        currSettings.noLabel = checked
+        labelBox:SetAlpha(checked and 0.35 or 1)
+        labelBox.editBox:SetEnabled(not checked)
+        CI:RefreshDisplay()
+    end)
+    noLabelCb:SetPoint("LEFT", labelBox, "RIGHT", 2, 0)
+    noLabelCb:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText("No Label", 1, 1, 1)
+        GameTooltip:Show()
+    end)
+    noLabelCb:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
     -- Format dropdown + custom template box below it (if custom selected)
     local fmtDD = DropDown(row, COL_ICON_CB - COL_FMT - 6, FORMAT_PRESETS, currSettings.formatPreset, function(opt)
