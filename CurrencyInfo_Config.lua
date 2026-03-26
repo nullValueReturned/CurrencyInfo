@@ -14,15 +14,16 @@ local CFG_H = 560
 -- Row layout in the currency list
 local ROW_H     = 28
 local ROW_PAD   = 4
-local COL_ICON    = 0
-local COL_NAME    = 26
-local COL_NOLABEL = 142
-local COL_LABEL   = 188
-local COL_FMT     = 310
-local COL_ICON_CB = 468
-local COL_UP      = 498
-local COL_DOWN    = 520
-local COL_DEL     = 542
+local COL_ICON     = 0
+local COL_NAME     = 26
+local COL_NOLABEL  = 142
+local COL_LABEL    = 188
+local COL_FMT      = 310
+local COL_TEMPLATE = 434
+local COL_ICON_CB  = 620
+local COL_UP       = 648
+local COL_DOWN     = 668
+local COL_DEL      = 688
 
 -- ============================================================
 -- Widget helpers
@@ -288,6 +289,7 @@ function CI:CreateConfigFrame()
     ColHdr("None",         COL_NOLABEL)
     ColHdr("Custom Label", COL_LABEL)
     ColHdr("Format",       COL_FMT)
+    ColHdr("Template",     COL_TEMPLATE)
     ColHdr("Icon",         COL_ICON_CB)
 
     -- Scroll frame for currency rows
@@ -454,18 +456,22 @@ function CI:BuildCurrencyRow(parent, index, currSettings)
     labelBox.editBox:SetScript("OnEnterPressed", function(self) SaveLabel(self); self:ClearFocus() end)
     labelBox.editBox:SetScript("OnEditFocusLost", SaveLabel)
 
-    -- Format dropdown + custom template box below it (if custom selected)
-    local fmtDD = DropDown(row, COL_ICON_CB - COL_FMT - 6, FORMAT_PRESETS, currSettings.formatPreset, function(opt)
+    -- Format dropdown
+    local fmtDD = DropDown(row, COL_TEMPLATE - COL_FMT - 6, FORMAT_PRESETS, currSettings.formatPreset, function(opt)
         currSettings.formatPreset = opt.id
-        row.ctBox:SetShown(opt.id == "custom")
+        local isCustom = opt.id == "custom"
+        row.ctBox:SetAlpha(isCustom and 1 or 0.35)
+        row.ctBox.editBox:SetEnabled(isCustom)
         CI:RefreshDisplay()
     end)
     fmtDD:SetPoint("LEFT", row, "LEFT", COL_FMT, 0)
 
-    -- Custom template edit box (shown only when "custom" preset is active)
-    local ctBox = EditBox(row, COL_ICON_CB - COL_FMT - 6, 20)
-    ctBox:SetPoint("TOPLEFT", row, "TOPLEFT", COL_FMT, -(ROW_H / 2))
-    ctBox:SetShown(currSettings.formatPreset == "custom")
+    -- Custom template edit box (always visible; greyed out unless "custom" is selected)
+    local isCustom = currSettings.formatPreset == "custom"
+    local ctBox = EditBox(row, COL_ICON_CB - COL_TEMPLATE - 6, 22)
+    ctBox:SetPoint("LEFT", row, "LEFT", COL_TEMPLATE, 0)
+    ctBox:SetAlpha(isCustom and 1 or 0.35)
+    ctBox.editBox:SetEnabled(isCustom)
     ctBox.editBox:SetText(currSettings.customTemplate or "")
     ctBox.editBox:SetFontObject(ChatFontNormal)
     local function SaveTemplate(self)
@@ -474,6 +480,20 @@ function CI:BuildCurrencyRow(parent, index, currSettings)
     end
     ctBox.editBox:SetScript("OnEnterPressed", function(self) SaveTemplate(self); self:ClearFocus() end)
     ctBox.editBox:SetScript("OnEditFocusLost", SaveTemplate)
+    ctBox.editBox:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText("Template Tokens", 1, 0.82, 0)
+        GameTooltip:AddLine("{label}     — label or currency name", 1, 1, 1)
+        GameTooltip:AddLine("{current}   — current quantity",       1, 1, 1)
+        GameTooltip:AddLine("{max}       — maximum quantity",       1, 1, 1)
+        GameTooltip:AddLine("{earned}    — total earned",           1, 1, 1)
+        GameTooltip:AddLine("{left}      — left to earn",           1, 1, 1)
+        GameTooltip:AddLine("{weekly}    — earned this week",       1, 1, 1)
+        GameTooltip:AddLine("{weeklycap} — weekly cap",             1, 1, 1)
+        GameTooltip:AddLine("{pct}       — current/max percent",    1, 1, 1)
+        GameTooltip:Show()
+    end)
+    ctBox.editBox:SetScript("OnLeave", function() GameTooltip:Hide() end)
     row.ctBox = ctBox
 
     -- Show Icon checkbox
