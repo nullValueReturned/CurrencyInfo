@@ -8,21 +8,21 @@ local FORMAT_PRESETS = ns.FORMAT_PRESETS
 local DeepMerge      = ns.DeepMerge
 local FNum           = ns.FNum
 
-local CFG_W = 680
+local CFG_W = 780
 local CFG_H = 560
 
 -- Row layout in the currency list
 local ROW_H     = 28
 local ROW_PAD   = 4
-local COL_ICON     = 0
-local COL_NAME     = 26
-local COL_NOLABEL  = 102
-local COL_LABEL    = 128
-local COL_FMT      = 250
-local COL_ICON_CB = 408
-local COL_UP    = 438
-local COL_DOWN  = 460
-local COL_DEL   = 482
+local COL_ICON    = 0
+local COL_NAME    = 26
+local COL_NOLABEL = 142
+local COL_LABEL   = 188
+local COL_FMT     = 310
+local COL_ICON_CB = 468
+local COL_UP      = 498
+local COL_DOWN    = 520
+local COL_DEL     = 542
 
 -- ============================================================
 -- Widget helpers
@@ -425,7 +425,7 @@ function CI:BuildCurrencyRow(parent, index, currSettings)
     local nameLbl = row:CreateFontString(nil, "OVERLAY")
     nameLbl:SetFont("Fonts\\FRIZQT__.TTF", 11, "")
     nameLbl:SetPoint("LEFT", row, "LEFT", COL_NAME, 0)
-    nameLbl:SetWidth(COL_LABEL - COL_NAME - 4)
+    nameLbl:SetWidth(COL_NOLABEL - COL_NAME - 4)
     nameLbl:SetText(data.name)
     nameLbl:SetTextColor(0.9, 0.9, 0.9)
     nameLbl:SetJustifyH("LEFT")
