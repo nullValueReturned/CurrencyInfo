@@ -65,46 +65,45 @@ local function EditBox(parent, w, h)
     return wrap
 end
 
--- Dropdown using WoW's UIDropDownMenuTemplate.
--- options:   array of { id, label }
--- currentId: id of initial selection
--- onChange:  function(option) called on selection change
--- maxLines:  (optional) max visible rows before scrolling (~16px each)
-local function DropDown(parent, width, options, currentId, onChange, maxLines)
-    local dd = CreateFrame("Frame", nil, parent, "UIDropDownMenuTemplate")
-    UIDropDownMenu_SetWidth(dd, width)
-    if maxLines then dd.maxLines = maxLines end
+-- Dropdown using WoW's modern DropdownButton / menu builder API (Dragonflight+).
+-- options:         array of { id, label, ... }
+-- currentId:       id of initial selection
+-- onChange:        function(option) called on selection change
+-- maxScrollHeight: (optional) pixel height cap before a scrollbar appears
+local function DropDown(parent, width, options, currentId, onChange, maxScrollHeight)
+    local dd = CreateFrame("DropdownButton", nil, parent, "WowStyle1DropdownTemplate")
+    dd:SetWidth(width)
 
-    local function SetSelected(id)
-        UIDropDownMenu_SetSelectedValue(dd, id)
-        for _, opt in ipairs(options) do
-            if opt.id == id then
-                UIDropDownMenu_SetText(dd, opt.label)
-                return
-            end
+    local selected = currentId
+
+    dd:SetSelectionText(function(selections)
+        if selections and #selections > 0 and selections[1].data then
+            return selections[1].data.label
         end
-    end
-
-    UIDropDownMenu_Initialize(dd, function(self, level)
         for _, opt in ipairs(options) do
-            local info    = UIDropDownMenu_CreateInfo()
-            info.text     = opt.label
-            info.value    = opt.id
-            info.checked  = (opt.id == UIDropDownMenu_GetSelectedValue(dd))
-            info.func     = function(btn)
-                SetSelected(btn.value)
-                for _, o in ipairs(options) do
-                    if o.id == btn.value then onChange(o); break end
-                end
-            end
-            UIDropDownMenu_AddButton(info)
+            if opt.id == selected then return opt.label end
+        end
+        return ""
+    end)
+
+    dd:SetupMenu(function(dropdown, rootDescription)
+        if maxScrollHeight then
+            rootDescription:SetScrollMode(maxScrollHeight)
+        end
+
+        local function IsSelected(data) return selected == data.id end
+        local function SetSelected(data)
+            selected = data.id
+            onChange(data)
+        end
+
+        for _, opt in ipairs(options) do
+            rootDescription:CreateRadio(opt.label, IsSelected, SetSelected, opt)
         end
     end)
 
-    SetSelected(currentId)
-
-    function dd:SetCurrentId(id) SetSelected(id) end
-    function dd:GetCurrentId()   return UIDropDownMenu_GetSelectedValue(dd) end
+    function dd:SetCurrentId(id) selected = id; dd:GenerateMenu() end
+    function dd:GetCurrentId()   return selected end
 
     return dd
 end
@@ -343,13 +342,11 @@ function CI:BuildDisplaySettings(p)
     rowBtn:SetScript("OnClick", function() layout.direction = "row";    UpdateDirBtns(); CI:RefreshDisplay() end)
 
     local fontLbl = Label(p, "Font:", 11); fontLbl:SetPoint("TOPLEFT", p, "TOPLEFT", 218, 0); fontLbl:SetTextColor(0.85,0.85,0.85)
-    -- UIDropDownMenu frame is wider than its content width; offset left by 16px so the
-    -- visible button aligns with where fontLbl ends.
     local fontDD = DropDown(p, 156, ns.GetFontOptions(), layout.fontFace, function(opt)
         layout.fontFace = opt.id
         CI:RefreshDisplay()
-    end, 18)  -- ~300px max height (18 rows × 16px)
-    fontDD:SetPoint("TOPLEFT", p, "TOPLEFT", 236, 2)
+    end, 300)
+    fontDD:SetPoint("TOPLEFT", p, "TOPLEFT", 252, 2)
 
     local fsLbl = Label(p, "Font Size:", 11); fsLbl:SetPoint("TOPLEFT", p, "TOPLEFT", 422, 0); fsLbl:SetTextColor(0.85,0.85,0.85)
     local fsBox = EditBox(p, 44, 22); fsBox:SetPoint("TOPLEFT", p, "TOPLEFT", 494, 2)
@@ -444,14 +441,12 @@ function CI:BuildCurrencyRow(parent, index, currSettings)
     labelBox.editBox:SetScript("OnEditFocusLost", SaveLabel)
 
     -- Format dropdown + custom template box below it (if custom selected)
-    -- UIDropDownMenu_SetWidth content width; subtract 16 from x so the visible button
-    -- aligns with COL_FMT after the template's built-in left padding.
-    local fmtDD = DropDown(row, COL_ICON_CB - COL_FMT - 20, FORMAT_PRESETS, currSettings.formatPreset, function(opt)
+    local fmtDD = DropDown(row, COL_ICON_CB - COL_FMT - 6, FORMAT_PRESETS, currSettings.formatPreset, function(opt)
         currSettings.formatPreset = opt.id
         row.ctBox:SetShown(opt.id == "custom")
         CI:RefreshDisplay()
     end)
-    fmtDD:SetPoint("LEFT", row, "LEFT", COL_FMT - 16, 0)
+    fmtDD:SetPoint("LEFT", row, "LEFT", COL_FMT, 0)
 
     -- Custom template edit box (shown only when "custom" preset is active)
     local ctBox = EditBox(row, COL_ICON_CB - COL_FMT - 6, 20)
