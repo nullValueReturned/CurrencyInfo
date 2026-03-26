@@ -3,11 +3,10 @@
 
 local ADDON_NAME, ns = ...
 
-local CI              = CurrencyInfoAddon
-local FORMAT_PRESETS  = ns.FORMAT_PRESETS
-local FONT_OPTIONS    = ns.FONT_OPTIONS
-local DeepMerge       = ns.DeepMerge
-local FNum            = ns.FNum
+local CI             = CurrencyInfoAddon
+local FORMAT_PRESETS = ns.FORMAT_PRESETS
+local DeepMerge      = ns.DeepMerge
+local FNum           = ns.FNum
 
 local CFG_W = 680
 local CFG_H = 560
@@ -66,45 +65,46 @@ local function EditBox(parent, w, h)
     return wrap
 end
 
--- Cycle button: left-click → forward, right-click → backward
--- options: array of { id, label, ... }
+-- Dropdown using WoW's UIDropDownMenuTemplate.
+-- options: array of { id, label }
 -- currentId: id of initial selection
--- onChange: function(option) called on change
-local function CycleButton(parent, options, currentId, onChange)
-    local btn = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
-    btn:SetSize(150, 22)
-    btn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+-- onChange: function(option) called on selection change
+local function DropDown(parent, width, options, currentId, onChange)
+    local dd = CreateFrame("Frame", nil, parent, "UIDropDownMenuTemplate")
+    UIDropDownMenu_SetWidth(dd, width)
 
-    local idx = 1
-    for i, opt in ipairs(options) do
-        if opt.id == currentId then idx = i; break end
-    end
-
-    local function Refresh()
-        btn:SetText(options[idx].label .. " \xE2\x96\xB8")  -- ▸ suffix
-    end
-    Refresh()
-
-    btn:SetScript("OnClick", function(self, mouseBtn)
-        if mouseBtn == "RightButton" then
-            idx = idx == 1 and #options or idx - 1
-        else
-            idx = idx == #options and 1 or idx + 1
+    local function SetSelected(id)
+        UIDropDownMenu_SetSelectedValue(dd, id)
+        for _, opt in ipairs(options) do
+            if opt.id == id then
+                UIDropDownMenu_SetText(dd, opt.label)
+                return
+            end
         end
-        Refresh()
-        if onChange then onChange(options[idx]) end
+    end
+
+    UIDropDownMenu_Initialize(dd, function(self, level)
+        for _, opt in ipairs(options) do
+            local info    = UIDropDownMenu_CreateInfo()
+            info.text     = opt.label
+            info.value    = opt.id
+            info.checked  = (opt.id == UIDropDownMenu_GetSelectedValue(dd))
+            info.func     = function(btn)
+                SetSelected(btn.value)
+                for _, o in ipairs(options) do
+                    if o.id == btn.value then onChange(o); break end
+                end
+            end
+            UIDropDownMenu_AddButton(info)
+        end
     end)
 
-    function btn:SetById(id)
-        for i, opt in ipairs(options) do
-            if opt.id == id then idx = i; break end
-        end
-        Refresh()
-    end
+    SetSelected(currentId)
 
-    function btn:GetCurrentId() return options[idx].id end
+    function dd:SetCurrentId(id) SetSelected(id) end
+    function dd:GetCurrentId()   return UIDropDownMenu_GetSelectedValue(dd) end
 
-    return btn
+    return dd
 end
 
 -- Simple checkbox (WoW's UICheckButtonTemplate, with optional label to the right)
@@ -341,16 +341,13 @@ function CI:BuildDisplaySettings(p)
     rowBtn:SetScript("OnClick", function() layout.direction = "row";    UpdateDirBtns(); CI:RefreshDisplay() end)
 
     local fontLbl = Label(p, "Font:", 11); fontLbl:SetPoint("TOPLEFT", p, "TOPLEFT", 218, 0); fontLbl:SetTextColor(0.85,0.85,0.85)
-    local fontBtn = CycleButton(p, FONT_OPTIONS, nil, function(opt)
-        layout.fontFace = opt.path
+    -- UIDropDownMenu frame is wider than its content width; offset left by 16px so the
+    -- visible button aligns with where fontLbl ends.
+    local fontDD = DropDown(p, 156, ns.GetFontOptions(), layout.fontFace, function(opt)
+        layout.fontFace = opt.id
         CI:RefreshDisplay()
     end)
-    fontBtn:SetSize(156, 22)
-    fontBtn:SetPoint("TOPLEFT", p, "TOPLEFT", 252, 2)
-    -- Set initial font selection
-    for _, opt in ipairs(FONT_OPTIONS) do
-        if opt.path == layout.fontFace then fontBtn:SetById(opt.id); break end
-    end
+    fontDD:SetPoint("TOPLEFT", p, "TOPLEFT", 236, 2)
 
     local fsLbl = Label(p, "Font Size:", 11); fsLbl:SetPoint("TOPLEFT", p, "TOPLEFT", 422, 0); fsLbl:SetTextColor(0.85,0.85,0.85)
     local fsBox = EditBox(p, 44, 22); fsBox:SetPoint("TOPLEFT", p, "TOPLEFT", 494, 2)
@@ -444,15 +441,15 @@ function CI:BuildCurrencyRow(parent, index, currSettings)
     labelBox.editBox:SetScript("OnEnterPressed", function(self) SaveLabel(self); self:ClearFocus() end)
     labelBox.editBox:SetScript("OnEditFocusLost", SaveLabel)
 
-    -- Format cycle button + custom template box below it (if custom selected)
-    local fmtBtn = CycleButton(row, FORMAT_PRESETS, currSettings.formatPreset, function(opt)
+    -- Format dropdown + custom template box below it (if custom selected)
+    -- UIDropDownMenu_SetWidth content width; subtract 16 from x so the visible button
+    -- aligns with COL_FMT after the template's built-in left padding.
+    local fmtDD = DropDown(row, COL_ICON_CB - COL_FMT - 20, FORMAT_PRESETS, currSettings.formatPreset, function(opt)
         currSettings.formatPreset = opt.id
         row.ctBox:SetShown(opt.id == "custom")
         CI:RefreshDisplay()
     end)
-    fmtBtn:SetSize(COL_ICON_CB - COL_FMT - 6, 22)
-    fmtBtn:SetPoint("LEFT", row, "LEFT", COL_FMT, 0)
-    fmtBtn:SetById(currSettings.formatPreset)
+    fmtDD:SetPoint("LEFT", row, "LEFT", COL_FMT - 16, 0)
 
     -- Custom template edit box (shown only when "custom" preset is active)
     local ctBox = EditBox(row, COL_ICON_CB - COL_FMT - 6, 20)

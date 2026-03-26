@@ -4,6 +4,7 @@
 ## Author:
 ## Version: 1.0.0
 ## SavedVariables: CurrencyInfoDB
+## OptionalDeps: LibSharedMedia-3.0
 
 CurrencyInfo.lua
 CurrencyInfo_Config.lua

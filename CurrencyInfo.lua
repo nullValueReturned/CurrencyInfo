@@ -20,11 +20,27 @@ ns.FORMAT_PRESETS = {
 }
 
 ns.FONT_OPTIONS = {
-    { id = "friz",     label = "Friz Quadrata",  path = "Fonts\\FRIZQT__.TTF" },
-    { id = "morpheus", label = "Morpheus",        path = "Fonts\\MORPHEUS.TTF" },
-    { id = "arial",    label = "Arial Narrow",    path = "Fonts\\ARIALN.TTF" },
-    { id = "skurri",   label = "Skurri",          path = "Fonts\\skurri.TTF" },
+    { id = "Fonts\\FRIZQT__.TTF", label = "Friz Quadrata", path = "Fonts\\FRIZQT__.TTF" },
+    { id = "Fonts\\MORPHEUS.TTF", label = "Morpheus",       path = "Fonts\\MORPHEUS.TTF" },
+    { id = "Fonts\\ARIALN.TTF",   label = "Arial Narrow",   path = "Fonts\\ARIALN.TTF" },
+    { id = "Fonts\\skurri.TTF",   label = "Skurri",         path = "Fonts\\skurri.TTF" },
 }
+
+-- Returns font options from LibSharedMedia-3.0 if loaded, otherwise the built-in list.
+-- Each entry: { id = path, label = name, path = path }
+function ns.GetFontOptions()
+    local lsm = LibStub and LibStub("LibSharedMedia-3.0", true)
+    if lsm then
+        local opts = {}
+        for _, name in ipairs(lsm:List("font")) do
+            local path = lsm:Fetch("font", name)
+            opts[#opts + 1] = { id = path, label = name, path = path }
+        end
+        table.sort(opts, function(a, b) return a.label < b.label end)
+        return opts
+    end
+    return ns.FONT_OPTIONS
+end
 
 local DB_DEFAULTS = {
     currencies = {},
