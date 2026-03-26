@@ -90,6 +90,9 @@ ns.FNum = FNum
 
 local function ApplyTemplate(template, data)
     local r = template
+    if not data.label or data.label == "" then
+        r = r:gsub("{label}:%s*", "")
+    end
     r = r:gsub("{label}",     function() return data.label or "" end)
     r = r:gsub("{current}",   function() return FNum(data.current) end)
     r = r:gsub("{max}",       function() return FNum(data.max) end)
