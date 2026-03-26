@@ -1,0 +1,9 @@
+## Interface: 110200
+## Title: CurrencyInfo
+## Notes: Track and display currencies with custom formatting. Right-click display or /ci to open settings.
+## Author:
+## Version: 1.0.0
+## SavedVariables: CurrencyInfoDB
+
+CurrencyInfo.lua
+CurrencyInfo_Config.lua
