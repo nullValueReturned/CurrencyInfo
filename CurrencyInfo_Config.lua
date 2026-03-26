@@ -73,7 +73,7 @@ end
 local function DropDown(parent, width, options, currentId, onChange, maxLines)
     local dd = CreateFrame("Frame", nil, parent, "UIDropDownMenuTemplate")
     UIDropDownMenu_SetWidth(dd, width)
-    if maxLines then UIDropDownMenu_SetMaxLines(dd, maxLines) end
+    if maxLines then dd.maxLines = maxLines end
 
     local function SetSelected(id)
         UIDropDownMenu_SetSelectedValue(dd, id)
