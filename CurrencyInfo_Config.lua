@@ -286,7 +286,7 @@ function CI:CreateConfigFrame()
     end
     ColHdr("",             COL_ICON)
     ColHdr("Name",         COL_NAME)
-    ColHdr("None",         COL_NOLABEL)
+    ColHdr("No label",         COL_NOLABEL)
     ColHdr("Custom Label", COL_LABEL)
     ColHdr("Format",       COL_FMT)
     ColHdr("Template",     COL_TEMPLATE)
@@ -520,11 +520,13 @@ function CI:BuildCurrencyRow(parent, index, currSettings)
         return b
     end
 
-    SmallBtn(COL_UP,   "Interface\\ChatFrame\\UI-ChatIcon-ScrollUp-Up",
-                       "Interface\\ChatFrame\\UI-ChatIcon-ScrollUp-Up",   "Move Up", function()
+    local upBtn = SmallBtn(COL_UP, "Interface\\ChatFrame\\UI-ChatIcon-ScrollDown-Up",
+                                   "Interface\\ChatFrame\\UI-ChatIcon-ScrollDown-Up", "Move Up", function()
         local t = CI.db.currencies
         if index > 1 then t[index], t[index-1] = t[index-1], t[index]; CI:RefreshDisplay(); CI:RefreshConfigCurrencyList() end
     end)
+    upBtn:GetNormalTexture():SetTexCoord(0, 1, 1, 0)
+    upBtn:GetHighlightTexture():SetTexCoord(0, 1, 1, 0)
 
     SmallBtn(COL_DOWN, "Interface\\ChatFrame\\UI-ChatIcon-ScrollDown-Up",
                        "Interface\\ChatFrame\\UI-ChatIcon-ScrollDown-Up", "Move Down", function()
