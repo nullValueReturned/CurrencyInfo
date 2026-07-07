@@ -26,6 +26,17 @@ ns.FONT_OPTIONS = {
     { id = "Fonts\\skurri.TTF",   label = "Skurri",         path = "Fonts\\skurri.TTF" },
 }
 
+ns.DEFAULT_FONT = "Fonts\\FRIZQT__.TTF"
+
+-- Sets a font on a FontString, falling back to the default font if the given
+-- path is invalid (e.g. it belonged to an addon like LibSharedMedia/ElvUI that
+-- has since been removed).
+function ns.SafeSetFont(fontString, path, size, flags)
+    if not (path and fontString:SetFont(path, size, flags)) then
+        fontString:SetFont(ns.DEFAULT_FONT, size, flags)
+    end
+end
+
 -- Returns font options from LibSharedMedia-3.0 if loaded, otherwise the built-in list.
 -- Each entry: { id = path, label = name, path = path }
 function ns.GetFontOptions()
@@ -238,7 +249,7 @@ function CI:BuildEntryFrame()
     icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 
     local text = f:CreateFontString(nil, "OVERLAY")
-    text:SetFont(layout.fontFace, layout.fontSize, "OUTLINE")
+    ns.SafeSetFont(text, layout.fontFace, layout.fontSize, "OUTLINE")
     text:SetJustifyH("LEFT")
     text:SetJustifyV("MIDDLE")
 
@@ -295,7 +306,7 @@ function CI:PopulateEntry(entry, currSettings, data)
         pct       = data.pct,
     })
 
-    entry.text:SetFont(layout.fontFace, layout.fontSize, "OUTLINE")
+    ns.SafeSetFont(entry.text, layout.fontFace, layout.fontSize, "OUTLINE")
     entry.text:SetText(displayText)
 
     local entryH = math.max(layout.iconSize, layout.fontSize + 2)
@@ -376,7 +387,7 @@ function CI:RefreshDisplay()
 
     if #self.db.currencies == 0 then
         self.mainFrame:SetSize(220, 36)
-        self.hintText:SetFont(self.db.layout.fontFace, self.db.layout.fontSize, "")
+        ns.SafeSetFont(self.hintText, self.db.layout.fontFace, self.db.layout.fontSize, "")
         self.hintText:Show()
         return
     end
@@ -404,6 +415,14 @@ function CI:Load()
     if not CurrencyInfoDB then CurrencyInfoDB = {} end
     DeepMerge(CurrencyInfoDB, DB_DEFAULTS)
     self.db = CurrencyInfoDB
+
+    -- Saved font may point at a path from an addon (e.g. LibSharedMedia/ElvUI)
+    -- that is no longer installed. Correct it permanently so the settings UI
+    -- doesn't keep pointing at a missing font.
+    local probe = UIParent:CreateFontString(nil, "OVERLAY")
+    if not (self.db.layout.fontFace and probe:SetFont(self.db.layout.fontFace, 12, "")) then
+        self.db.layout.fontFace = ns.DEFAULT_FONT
+    end
 
     self:CreateMainFrame()
 
