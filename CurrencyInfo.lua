@@ -120,7 +120,7 @@ local FLASH_TIME = 2.5
 -- ============================================================
 
 local function Say(msg)
-    print("|cFF00FFFFCurrencyInfo|r: " .. msg)
+    print("|cFF8160FFAnde Currency Info|r: " .. msg)
 end
 
 local function DeepMerge(target, defaults)
@@ -456,21 +456,20 @@ function CI:CreateMinimapButton()
     btn:SetFrameLevel(8)
     btn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     btn:RegisterForDrag("LeftButton")
-    btn:SetHighlightTexture("Interface\Minimap\UI-Minimap-ZoomButton-Highlight")
+    btn:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
 
     local bg = btn:CreateTexture(nil, "BACKGROUND")
     bg:SetSize(20, 20)
     bg:SetPoint("TOPLEFT", 7, -5)
-    bg:SetTexture("Interface\Minimap\UI-Minimap-Background")
+    bg:SetTexture("Interface\\Minimap\\UI-Minimap-Background")
     local icon = btn:CreateTexture(nil, "ARTWORK")
     icon:SetSize(17, 17)
     icon:SetPoint("TOPLEFT", 7, -6)
-    icon:SetTexture("Interface\Icons\INV_Misc_Coin_01")
-    icon:SetTexCoord(0.05, 0.95, 0.05, 0.95)
+    icon:SetTexture("Interface\\AddOns\\CurrencyInfo\\icon")
     local border = btn:CreateTexture(nil, "OVERLAY")
     border:SetSize(53, 53)
     border:SetPoint("TOPLEFT")
-    border:SetTexture("Interface\Minimap\MiniMap-TrackingBorder")
+    border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
 
     btn:SetScript("OnClick", function(_, mouse)
         if mouse == "RightButton" then
@@ -481,8 +480,8 @@ function CI:CreateMinimapButton()
             CI:ToggleConfig()
         end
     end)
-    btn:SetScript("OnDragStart", function(self)
-        self:SetScript("OnUpdate", function()
+    btn:SetScript("OnDragStart", function(b)
+        b:SetScript("OnUpdate", function()
             local mx, my = Minimap:GetCenter()
             local scale = Minimap:GetEffectiveScale()
             local cx, cy = GetCursorPosition()
@@ -490,10 +489,10 @@ function CI:CreateMinimapButton()
             CI:UpdateMinimapButton()
         end)
     end)
-    btn:SetScript("OnDragStop", function(self) self:SetScript("OnUpdate", nil) end)
-    btn:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-        GameTooltip:SetText("CurrencyInfo")
+    btn:SetScript("OnDragStop", function(b) b:SetScript("OnUpdate", nil) end)
+    btn:SetScript("OnEnter", function(b)
+        GameTooltip:SetOwner(b, "ANCHOR_LEFT")
+        GameTooltip:SetText("Ande Currency Info", 1, 1, 1)
         GameTooltip:AddLine("Left-click: open settings", 1, 1, 1)
         GameTooltip:AddLine("Right-click: show / hide display", 1, 1, 1)
         GameTooltip:AddLine("Drag: move this button", 0.5, 0.5, 0.5)
@@ -865,7 +864,7 @@ function CI:Load()
     SLASH_CURRENCYINFO2 = "/currencyinfo"
     SlashCmdList["CURRENCYINFO"] = function(msg) CI:HandleSlash(msg) end
 
-    print("|cFF00FFFFCurrencyInfo|r v" .. VERSION .. " loaded. Right-click display or |cFFFFFF00/ci|r to open settings.")
+    print("|cFF8160FFAnde Currency Info|r v" .. VERSION .. " loaded. Right-click display or |cFFFFFF00/ci|r to open settings.")
 end
 
 function CI:HandleSlash(msg)
@@ -908,7 +907,7 @@ function CI:HandleSlash(msg)
         self.db.position = { point = "CENTER", x = 0, y = 0 }
         Say("Position reset.")
     else
-        print("|cFF00FFFFCurrencyInfo|r commands:")
+        print("|cFF8160FFAnde Currency Info|r commands:")
         print("  |cFFFFFF00/ci|r                  — open settings")
         print("  |cFFFFFF00/ci browse|r           — pick currencies from a list")
         print("  |cFFFFFF00/ci add <id|name>|r    — track a currency")
@@ -936,7 +935,7 @@ end
 
 function CurrencyInfo_OnAddonCompartmentEnter(_, frame)
     GameTooltip:SetOwner(frame, "ANCHOR_LEFT")
-    GameTooltip:SetText("CurrencyInfo")
+    GameTooltip:SetText("Ande Currency Info", 1, 1, 1)
     GameTooltip:AddLine("Left-click: open settings", 1, 1, 1)
     GameTooltip:AddLine("Right-click: show / hide display", 1, 1, 1)
     GameTooltip:Show()

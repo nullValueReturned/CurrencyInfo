@@ -131,7 +131,7 @@ function CI:CreateConfigFrame()
     bar:SetPoint("TOPLEFT"); bar:SetPoint("BOTTOMLEFT"); bar:SetWidth(3)
     UI.OnAccent(function(r, g, b) bar:SetColorTexture(r, g, b, 1) end)
 
-    local title = UI.Text(header, "title", "CurrencyInfo")
+    local title = UI.Text(header, "title", "Ande Currency Info")
     title:SetPoint("LEFT", header, "LEFT", 16, 0)
     UI.AccentText(title)
     local sub = Caption(header, "Settings")
@@ -820,9 +820,9 @@ function CI:RegisterSettingsPanel()
     if not (Settings and Settings.RegisterCanvasLayoutCategory) then return end
 
     local panel = CreateFrame("Frame")
-    panel.name = "CurrencyInfo"
+    panel.name = "Ande Currency Info"
 
-    local title = UI.Text(panel, "title", "CurrencyInfo")
+    local title = UI.Text(panel, "title", "Ande Currency Info")
     title:SetPoint("TOPLEFT", panel, "TOPLEFT", 16, -16)
     UI.AccentText(title)
     local desc = UI.Text(panel, "body", "Track and display currencies with custom formatting.\nYou can also type /ci or right-click the display.")
@@ -835,7 +835,7 @@ function CI:RegisterSettingsPanel()
         CI:OpenConfig()
     end)
 
-    local category = Settings.RegisterCanvasLayoutCategory(panel, "CurrencyInfo")
+    local category = Settings.RegisterCanvasLayoutCategory(panel, "Ande Currency Info")
     Settings.RegisterAddOnCategory(category)
 end
 

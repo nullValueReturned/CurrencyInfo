@@ -1,4 +1,4 @@
-# CurrencyInfo
+# Ande Currency Info
 
 A World of Warcraft addon that shows the currencies you care about in a small movable frame, with formatting you control.
 
@@ -17,7 +17,7 @@ A World of Warcraft addon that shows the currencies you care about in a small mo
 
 ## Installation
 
-Copy the `CurrencyInfo` folder into `World of Warcraft/_retail_/Interface/AddOns/` and restart the game or `/reload`.
+Copy the `CurrencyInfo` folder (the folder name stays `CurrencyInfo`, even though the addon is called Ande Currency Info) into `World of Warcraft/_retail_/Interface/AddOns/` and restart the game or `/reload`.
 
 [LibSharedMedia-3.0](https://www.curseforge.com/wow/addons/libsharedmedia-3-0) is optional. If another addon loads it, its fonts appear in the font dropdown.
 
