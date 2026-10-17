@@ -1,4 +1,4 @@
-## Interface: 120000, 120001
+## Interface: 120100, 120105
 ## Title: Ande Currency Info
 ## Notes: Track and display currencies with custom formatting. Right-click display or /ci to open settings.
 ## Author:
