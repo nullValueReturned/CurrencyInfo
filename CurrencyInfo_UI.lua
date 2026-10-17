@@ -416,7 +416,7 @@ function UI.ScrollFrame(parent)
     return sf
 end
 
--- options: array of { id, label }. onChange(option) fires on picks. maxHeight caps the popup;
+-- options: array of { id, label, accent? } (accent tints that option). onChange(option) fires on picks. maxHeight caps the popup;
 -- up opens it above the button. The popup hangs off UIParent so scroll frames never clip it.
 -- Returns the button; btn:SetCurrentId(id) changes the selection without firing onChange.
 function UI.Dropdown(parent, width, options, currentId, onChange, maxHeight, up)
@@ -469,7 +469,10 @@ function UI.Dropdown(parent, width, options, currentId, onChange, maxHeight, up)
             if cur then shown = o end
         end
         shown = shown or options[1]
-        if shown then btn:SetText(shown.label) end
+        if shown then
+            btn:SetText(shown.label)
+            btn:SetSelected(shown.accent and true or false) -- accent-tinted options stand out
+        end
     end
 
     for i, o in ipairs(options) do
@@ -497,6 +500,7 @@ function UI.Dropdown(parent, width, options, currentId, onChange, maxHeight, up)
         lbl:SetJustifyH("LEFT")
         lbl:SetWordWrap(false)
         lbl:SetText(o.label)
+        if o.accent then UI.AccentText(lbl) end
 
         row:SetScript("OnClick", function()
             selected = o.id

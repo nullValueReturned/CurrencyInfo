@@ -20,11 +20,9 @@ local ROW_PAD      = 2
 local COL_GRIP     = 2
 local COL_ICON     = 22
 local COL_NAME     = 48
-local COL_NOLABEL  = 154
-local COL_LABEL    = 208
-local COL_FMT      = 304
-local COL_TEMPLATE = 428
-local COL_PREVIEW  = 562
+local COL_FMT      = 204
+local COL_CUSTOM   = 360
+local COL_PREVIEW  = 556
 local COL_ICON_CB  = 700
 local COL_OPTS     = 744
 local COL_DEL      = 770
@@ -240,10 +238,8 @@ function CI:CreateConfigFrame()
         lbl:SetPoint("TOPLEFT", f, "TOPLEFT", 16 + x, hdrY)
     end
     ColHdr("Name",     COL_NAME)
-    ColHdr("No label", COL_NOLABEL)
-    ColHdr("Label",    COL_LABEL)
     ColHdr("Format",   COL_FMT)
-    ColHdr("Template", COL_TEMPLATE)
+    ColHdr("Custom",   COL_CUSTOM)
     ColHdr("Preview",  COL_PREVIEW)
     ColHdr("Icon",     COL_ICON_CB)
 
@@ -630,49 +626,35 @@ local function BuildRow(parent, index)
     -- Name
     local nameLbl = UI.Text(row, "body")
     nameLbl:SetPoint("LEFT", row, "LEFT", COL_NAME, 0)
-    nameLbl:SetWidth(COL_NOLABEL - COL_NAME - 4)
+    nameLbl:SetWidth(COL_FMT - COL_NAME - 6)
     nameLbl:SetJustifyH("LEFT")
     nameLbl:SetWordWrap(false)
 
-    -- "No label" toggle: hide the label entirely
-    local noLabelCb = Checkbox(row, false, nil, function(checked)
-        row.cur.noLabel = checked
-        row.labelBox:SetActive(not checked)
-        row:UpdatePreview()
-        CI:RefreshDisplay()
-    end)
-    noLabelCb:SetPoint("LEFT", row, "LEFT", COL_NOLABEL, 0)
-
-    -- Custom label input (applies as you type)
-    local labelBox = EditBox(row, COL_FMT - COL_LABEL - 6, 24)
-    labelBox:SetPoint("LEFT", row, "LEFT", COL_LABEL, 0)
-    labelBox:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
-    labelBox:SetScript("OnTextChanged", function(self, user)
-        if not user then return end
-        row.cur.customLabel = self:GetText()
-        row:UpdatePreview()
-        CI:RefreshDisplay()
-    end)
-    row.labelBox = labelBox
-
     -- Format dropdown
-    local fmtDD = DropDown(row, COL_TEMPLATE - COL_FMT - 6, FORMAT_PRESETS, "current_max", function(opt)
-        row.cur.formatPreset = opt.id
-        row.ctBox:SetActive(opt.id == "custom")
+    local fmtDD = DropDown(row, COL_CUSTOM - COL_FMT - 6, FORMAT_PRESETS, "current_max", function(opt)
+        local cur, prev = row.cur, row.cur.formatPreset
+        cur.formatPreset = opt.id
+        -- Start "Custom" from the preset that was in use, unless the user wrote their own before.
+        if opt.id == "custom" and not cur.customEdited then
+            cur.customTemplate = ns.GetPresetTemplate(prev) or cur.customTemplate
+        end
+        row:SyncTemplate()
         row:UpdatePreview()
         CI:RefreshDisplay()
     end)
     fmtDD:SetPoint("LEFT", row, "LEFT", COL_FMT, 0)
 
-    -- Custom template (greyed out unless "Custom"; turns red on an unknown {token})
-    local ctBox = EditBox(row, COL_PREVIEW - COL_TEMPLATE - 6, 24)
-    ctBox:SetPoint("LEFT", row, "LEFT", COL_TEMPLATE, 0)
+    -- Template: shows the preset's template greyed out, editable once "Custom" is chosen
+    -- (turns red on an unknown {token})
+    local ctBox = EditBox(row, COL_PREVIEW - COL_CUSTOM - 6, 24)
+    ctBox:SetPoint("LEFT", row, "LEFT", COL_CUSTOM, 0)
     ctBox:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
     ctBox:SetScript("OnTextChanged", function(self, user)
         local bad = HasUnknownToken(self:GetText())
         if bad then self:SetTextColor(1, 0.45, 0.45) else self:SetTextColor(1, 1, 1) end
         if not user then return end
         row.cur.customTemplate = self:GetText()
+        row.cur.customEdited = true
         row:UpdatePreview()
         CI:RefreshDisplay()
     end)
@@ -700,6 +682,13 @@ local function BuildRow(parent, index)
     SmallBtn(row, COL_DEL, "Interface\\Buttons\\UI-StopButton", "Remove", function()
         CI:RemoveCurrency(row.cur.id)
     end)
+
+    function row:SyncTemplate()
+        local cur = self.cur
+        local custom = cur.formatPreset == "custom"
+        ctBox:SetText(custom and (cur.customTemplate or "") or ns.GetPresetTemplate(cur.formatPreset) or "")
+        ctBox:SetActive(custom)
+    end
 
     function row:UpdatePreview()
         local cur = self.cur
@@ -746,12 +735,8 @@ local function BuildRow(parent, index)
             nameLbl:SetTextColor(1, 0.4, 0.4, 1)
         end
 
-        noLabelCb:SetState(cur.noLabel)
-        labelBox:SetText(cur.customLabel or "")
-        labelBox:SetActive(not cur.noLabel)
         fmtDD:SetCurrentId(cur.formatPreset)
-        ctBox:SetText(cur.customTemplate or "")
-        ctBox:SetActive(cur.formatPreset == "custom")
+        self:SyncTemplate()
         iconCb:SetState(cur.showIcon)
 
         self:UpdatePreview()

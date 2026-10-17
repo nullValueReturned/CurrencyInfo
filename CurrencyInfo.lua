@@ -16,7 +16,7 @@ ns.FORMAT_PRESETS = {
     { id = "earned_max",   label = "Earned / Max",      template = "{label}: {earned} / {max}" },
     { id = "weekly",       label = "Weekly Progress",   template = "{label}: {weekly} / {weeklycap}" },
     { id = "pct",          label = "Percentage",        template = "{label}: {pct}" },
-    { id = "custom",       label = "Custom",            template = nil },
+    { id = "custom",       label = "Custom",            template = nil, accent = true },
 }
 
 ns.CAP_ACTIONS = {
@@ -27,7 +27,7 @@ ns.CAP_ACTIONS = {
 
 -- Template tokens: used for validation and for the help tooltips.
 ns.TOKEN_HELP = {
-    { "{label}",     "custom label or currency name" },
+    { "{label}",     "currency name" },
     { "{current}",   "current quantity" },
     { "{max}",       "maximum quantity" },
     { "{earned}",    "total earned" },
@@ -101,8 +101,6 @@ ns.DB_DEFAULTS = DB_DEFAULTS
 
 ns.CURRENCY_DEFAULTS = {
     id             = 0,
-    customLabel    = "",
-    noLabel        = false,
     showIcon       = true,
     formatPreset   = "current_max",
     customTemplate = "{label}: {current} / {max}",
@@ -179,6 +177,12 @@ local function GetCurrencyData(currencyId)
 end
 ns.GetCurrencyData = GetCurrencyData
 
+function ns.GetPresetTemplate(id)
+    for _, p in ipairs(ns.FORMAT_PRESETS) do
+        if p.id == id then return p.template end
+    end
+end
+
 local function GetTemplate(currSettings)
     if currSettings.formatPreset == "custom" then
         return currSettings.customTemplate or "{label}: {current}"
@@ -194,9 +198,7 @@ ns.GetTemplate = GetTemplate
 
 -- The text shown for one currency (used by the display and the settings preview).
 function ns.FormatCurrency(currSettings, data)
-    local custom = currSettings.customLabel or ""
-    local label = currSettings.noLabel and "" or (custom ~= "" and custom) or data.name
-    return ApplyTemplate(GetTemplate(currSettings), setmetatable({ label = label }, { __index = data }))
+    return ApplyTemplate(GetTemplate(currSettings), setmetatable({ label = data.name }, { __index = data }))
 end
 
 -- How close the currency is to its cap, 0-100+: the highest of current/max
@@ -319,6 +321,25 @@ function CI:AddAllCapped()
     return added
 end
 
+-- Older versions had a per-currency custom label and a "no label" switch. Fold them into a
+-- custom template so nothing is lost.
+function CI:MigrateLegacyLabels()
+    for _, c in ipairs(self.db.currencies) do
+        if (c.customLabel and c.customLabel ~= "") or c.noLabel then
+            local template = GetTemplate(c)
+            if c.noLabel then
+                template = template:gsub("{label}:%s*", ""):gsub("{label}", "")
+            else
+                template = template:gsub("{label}", function() return c.customLabel end)
+            end
+            c.formatPreset   = "custom"
+            c.customTemplate = template
+            c.customEdited   = true
+        end
+        c.customLabel, c.noLabel = nil, nil
+    end
+end
+
 function CI:OnTrackedChanged()
     self:RefreshDisplay()
     if self.RefreshConfigCurrencyList then self:RefreshConfigCurrencyList() end
@@ -398,18 +419,28 @@ function CI:CreateMainFrame()
 end
 
 function CI:UpdateBackdrop()
-    local layout = self.db.layout
-    if layout.showBackground then
-        self.mainFrame:SetBackdrop({
-            bgFile   = "Interface\\DialogFrame\\UI-DialogBox-Background",
-            edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-            tile = true, tileSize = 32, edgeSize = 12,
-            insets = { left = 3, right = 3, top = 3, bottom = 3 },
-        })
-        self.mainFrame:SetBackdropColor(0, 0, 0, layout.bgAlpha)
-        self.mainFrame:SetBackdropBorderColor(0.4, 0.4, 0.4, math.min(0.9, layout.bgAlpha + 0.15))
-    else
-        self.mainFrame:SetBackdrop(nil)
+    local layout, f, UI = self.db.layout, self.mainFrame, ns.UI
+
+    -- Same flat look as the settings window: solid fill, hairline border, accent bar on the left.
+    if not f.bg then
+        UI.Surface(f, UI.Colors.window, { 1, 1, 1, 0.12 })
+        f.bg = f.arBg
+        f.edge = f.arBorder
+        local bar = f:CreateTexture(nil, "ARTWORK")
+        bar:SetPoint("TOPLEFT"); bar:SetPoint("BOTTOMLEFT"); bar:SetWidth(2)
+        UI.OnAccent(function(r, g, b) bar:SetColorTexture(r, g, b, 1) end)
+        f.accentBar = bar
+    end
+
+    local show = layout.showBackground
+    f.bg:SetShown(show)
+    f.accentBar:SetShown(show)
+    for _, t in ipairs(f.edge) do t:SetShown(show) end
+    if show then
+        local c = UI.Colors.window
+        f.bg:SetColorTexture(c[1], c[2], c[3], layout.bgAlpha)
+        f.edge:SetColor(1, 1, 1, 0.12 * math.min(1, layout.bgAlpha + 0.25))
+        f.accentBar:SetAlpha(math.max(0.35, layout.bgAlpha))
     end
 end
 
@@ -757,6 +788,7 @@ function CI:Load()
         self.db.layout.fontFace = ns.DEFAULT_FONT
     end
 
+    self:MigrateLegacyLabels()
     self.inCombat = InCombatLockdown() and true or false
     self:CreateMainFrame()
 

@@ -38,21 +38,19 @@ Each row has:
 | Column | What it does |
 | --- | --- |
 | Grip | Drag to reorder |
-| No label | Hide the label and show only the values |
-| Label | Replace the currency name with your own text |
 | Format | Choose a preset or `Custom` |
-| Template | Your own template, active when the format is `Custom` |
+| Custom | The template. Shows the preset's template greyed out, and becomes editable when the format is `Custom` |
 | Preview | What the display will show |
 | Icon | Show or hide the icon |
 | Gear | Text color and cap behaviour (see below) |
 
 ### Templates
 
-Use these tokens in a custom template. The box turns red if it contains one that does not exist.
+Pick `Custom` in the Format column to edit the template. It starts from the preset you were using. Write any text you like around the tokens, for example to rename a currency or hide its name. The box turns red if it contains a token that does not exist.
 
 | Token | Value |
 | --- | --- |
-| `{label}` | Custom label or currency name |
+| `{label}` | Currency name |
 | `{current}` | Current quantity |
 | `{max}` | Maximum quantity |
 | `{earned}` | Total earned |
@@ -61,7 +59,7 @@ Use these tokens in a custom template. The box turns red if it contains one that
 | `{weeklycap}` | Weekly cap |
 | `{pct}` | Current / max as a percentage |
 
-Example: `{label}: {current} ({weekly}/{weeklycap} this week)`
+Examples: `{label}: {current} ({weekly}/{weeklycap} this week)` or `Valor: {current} / {max}`
 
 ### Cap behaviour
 
