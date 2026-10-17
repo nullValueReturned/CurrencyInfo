@@ -92,7 +92,7 @@ The accent color of the settings window can be changed with the swatch in its he
 | `/ci lock` | Lock or unlock the frame |
 | `/ci reset` | Move the frame back to the center of the screen |
 
-`/currencyinfo` works as well.
+`/aci` and `/currencyinfo` work as well, for example `/aci browse`.
 
 ## Notes
 

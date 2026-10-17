@@ -862,6 +862,7 @@ function CI:Load()
 
     SLASH_CURRENCYINFO1 = "/ci"
     SLASH_CURRENCYINFO2 = "/currencyinfo"
+    SLASH_CURRENCYINFO3 = "/aci"
     SlashCmdList["CURRENCYINFO"] = function(msg) CI:HandleSlash(msg) end
 
     print("|cFF8160FFAnde Currency Info|r v" .. VERSION .. " loaded. Right-click display or |cFFFFFF00/ci|r to open settings.")
