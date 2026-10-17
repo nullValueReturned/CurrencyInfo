@@ -6,130 +6,91 @@ local ADDON_NAME, ns = ...
 local CI             = CurrencyInfoAddon
 local FORMAT_PRESETS = ns.FORMAT_PRESETS
 local DeepMerge      = ns.DeepMerge
-local FNum           = ns.FNum
 
-local CFG_W = 780
-local CFG_H = 560
+local UI = ns.UI
+
+local CFG_W      = 860
+local CFG_H      = 700
+local DS_H       = 168   -- height of the display settings block
+local BOTTOM_PAD = 16
 
 -- Row layout in the currency list
-local ROW_H     = 28
-local ROW_PAD   = 4
-local COL_ICON     = 0
-local COL_NAME     = 26
-local COL_NOLABEL  = 142
-local COL_LABEL    = 188
-local COL_FMT      = 310
-local COL_TEMPLATE = 434
-local COL_ICON_CB  = 620
-local COL_UP       = 648
-local COL_DOWN     = 668
-local COL_DEL      = 688
+local ROW_H        = 30
+local ROW_PAD      = 2
+local COL_GRIP     = 2
+local COL_ICON     = 22
+local COL_NAME     = 48
+local COL_NOLABEL  = 154
+local COL_LABEL    = 208
+local COL_FMT      = 304
+local COL_TEMPLATE = 428
+local COL_PREVIEW  = 562
+local COL_ICON_CB  = 700
+local COL_OPTS     = 744
+local COL_DEL      = 770
 
 -- ============================================================
--- Widget helpers
+-- Widget helpers (thin wrappers over ns.UI)
 -- ============================================================
 
-local function Label(parent, text, size)
-    local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    if size then fs:SetFont("Fonts\\FRIZQT__.TTF", size, "") end
-    fs:SetText(text)
-    return fs
+local function Label(parent, text)
+    return UI.Text(parent, "body", text)
 end
 
-local function Button(parent, text, w, h)
-    local b = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
-    b:SetSize(w or 80, h or 22)
-    b:SetText(text)
-    return b
+-- Muted small-caps style caption for headings, column headers and hints.
+local function Caption(parent, text)
+    return UI.Text(parent, "small", text and text:upper())
 end
 
--- Minimal styled edit box
+local Button = UI.Button
+
+-- Flat input; returns the EditBox.
 local function EditBox(parent, w, h)
-    local wrap = CreateFrame("Frame", nil, parent, "BackdropTemplate")
-    wrap:SetSize(w or 120, h or 22)
-    wrap:SetBackdrop({
-        bgFile   = "Interface\\ChatFrame\\ChatFrameBackground",
-        edgeFile = "Interface\\ChatFrame\\ChatFrameBackground",
-        tile = false, edgeSize = 1,
-        insets = { left = 1, right = 1, top = 1, bottom = 1 },
-    })
-    wrap:SetBackdropColor(0, 0, 0, 0.6)
-    wrap:SetBackdropBorderColor(0.3, 0.3, 0.3, 0.9)
-
-    local eb = CreateFrame("EditBox", nil, wrap)
-    eb:SetPoint("TOPLEFT",     wrap, "TOPLEFT",     4, -2)
-    eb:SetPoint("BOTTOMRIGHT", wrap, "BOTTOMRIGHT", -4, 2)
-    eb:SetAutoFocus(false)
-    eb:SetFontObject(ChatFontNormal)
-    eb:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
-
-    wrap.editBox = eb
-    return wrap
+    return UI.Input(parent, w, h)
 end
 
--- Dropdown using WoW's modern DropdownButton / menu builder API (Dragonflight+).
--- options:         array of { id, label, ... }
--- currentId:       id of initial selection
--- onChange:        function(option) called on selection change
--- maxScrollHeight: (optional) pixel height cap before a scrollbar appears
-local function DropDown(parent, width, options, currentId, onChange, maxScrollHeight)
-    local dd = CreateFrame("DropdownButton", nil, parent, "WowStyle1DropdownTemplate")
-    dd:SetWidth(width)
-
-    local selected = currentId
-
-    dd:SetSelectionText(function(selections)
-        if selections and #selections > 0 and selections[1].data then
-            return selections[1].data.label
-        end
-        for _, opt in ipairs(options) do
-            if opt.id == selected then return opt.label end
-        end
-        return ""
-    end)
-
-    dd:SetupMenu(function(dropdown, rootDescription)
-        if maxScrollHeight then
-            rootDescription:SetScrollMode(maxScrollHeight)
-        end
-
-        local function IsSelected(data) return selected == data.id end
-        local function SetSelected(data)
-            selected = data.id
-            onChange(data)
-        end
-
-        for _, opt in ipairs(options) do
-            rootDescription:CreateRadio(opt.label, IsSelected, SetSelected, opt)
-        end
-    end)
-
-    function dd:SetCurrentId(id) selected = id; dd:GenerateMenu() end
-    function dd:GetCurrentId()   return selected end
-
-    return dd
+local function DropDown(parent, width, options, currentId, onChange, maxScrollHeight, up)
+    return UI.Dropdown(parent, width, options, currentId, onChange, maxScrollHeight, up)
 end
 
--- Simple checkbox (WoW's UICheckButtonTemplate, with optional label to the right)
+-- Pill toggle with an optional label to its right.
 local function Checkbox(parent, checked, label, onChange)
-    local cb = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
-    cb:SetSize(22, 22)
-    cb:SetChecked(checked)
-    if label and cb.text then cb.text:SetText(label) end
-    cb:SetScript("OnClick", function(self)
-        if onChange then onChange(self:GetChecked()) end
-    end)
+    local cb = UI.Toggle(parent, checked, onChange)
+    if label then
+        local fs = Label(parent, label)
+        fs:SetPoint("LEFT", cb, "RIGHT", 4, 0)
+        cb.text = fs
+    end
     return cb
 end
 
--- Horizontal separator line
 local function Separator(parent, yAnchor)
-    local line = parent:CreateTexture(nil, "ARTWORK")
-    line:SetHeight(1)
-    line:SetPoint("TOPLEFT",  parent, "TOPLEFT",  16, yAnchor)
-    line:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -16, yAnchor)
-    line:SetColorTexture(0.4, 0.4, 0.4, 0.6)
-    return line
+    return UI.Divider(parent, yAnchor, 16)
+end
+
+local function ShowTokenTooltip(owner)
+    GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+    GameTooltip:SetText("Template tokens", UI.accent.r, UI.accent.g, UI.accent.b)
+    for _, t in ipairs(ns.TOKEN_HELP) do
+        GameTooltip:AddDoubleLine(t[1], t[2], 1, 1, 1, 0.8, 0.8, 0.8)
+    end
+    GameTooltip:Show()
+end
+
+local function HideTooltip() GameTooltip:Hide() end
+
+-- True if the template contains a {token} that doesn't exist.
+local function HasUnknownToken(template)
+    for name in (template or ""):gmatch("{(%w+)}") do
+        if not ns.TOKENS[name] then return true end
+    end
+    return false
+end
+
+function CI:SetFeedback(text, r, g, b)
+    if not self.cfgFeedback then return end
+    self.cfgFeedback:SetText(text)
+    self.cfgFeedback:SetTextColor(r or 1, g or 1, b or 1)
 end
 
 -- ============================================================
@@ -137,7 +98,7 @@ end
 -- ============================================================
 
 function CI:CreateConfigFrame()
-    local f = CreateFrame("Frame", "CurrencyInfoConfigFrame", UIParent, "BackdropTemplate")
+    local f = CreateFrame("Frame", "CurrencyInfoConfigFrame", UIParent)
     f:SetSize(CFG_W, CFG_H)
     f:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
     f:SetClampedToScreen(true)
@@ -146,175 +107,190 @@ function CI:CreateConfigFrame()
     f:RegisterForDrag("LeftButton")
     f:SetScript("OnDragStart", f.StartMoving)
     f:SetScript("OnDragStop",  f.StopMovingOrSizing)
-    f:SetBackdrop({
-        bgFile   = "Interface\\DialogFrame\\UI-DialogBox-Background",
-        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-        tile = true, tileSize = 32, edgeSize = 20,
-        insets = { left = 5, right = 5, top = 5, bottom = 5 },
-    })
-    f:SetBackdropColor(0, 0, 0, 0.92)
-    f:SetBackdropBorderColor(0.6, 0.6, 0.6, 1)
     f:SetFrameStrata("HIGH")
+    UI.Surface(f, UI.Colors.window, { 1, 1, 1, 0.09 })
+    UI.FadeInOnShow(f)
     f:Hide()
     self.configFrame = f
+    tinsert(UISpecialFrames, "CurrencyInfoConfigFrame")
 
-    -- Title
-    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOP", f, "TOP", 0, -14)
-    title:SetText("CurrencyInfo Settings")
-    title:SetTextColor(1, 0.82, 0)
+    -- Header bar: accent title, accent picker, close
+    local header = CreateFrame("Frame", nil, f)
+    header:SetPoint("TOPLEFT", f, "TOPLEFT", 1, -1)
+    header:SetPoint("TOPRIGHT", f, "TOPRIGHT", -1, -1)
+    header:SetHeight(44)
+    local hbg = header:CreateTexture(nil, "BACKGROUND")
+    hbg:SetAllPoints()
+    hbg:SetColorTexture(unpack(UI.Colors.header))
+    -- Accent wash fading down from the top edge
+    local wash = header:CreateTexture(nil, "BACKGROUND", nil, 1)
+    wash:SetAllPoints()
+    UI.OnAccent(function(r, g, b)
+        wash:SetGradient("VERTICAL", CreateColor(r, g, b, 0), CreateColor(r, g, b, 0.14))
+    end)
+    local bar = header:CreateTexture(nil, "ARTWORK")
+    bar:SetPoint("TOPLEFT"); bar:SetPoint("BOTTOMLEFT"); bar:SetWidth(3)
+    UI.OnAccent(function(r, g, b) bar:SetColorTexture(r, g, b, 1) end)
 
-    -- Close
-    local closeBtn = CreateFrame("Button", nil, f, "UIPanelCloseButton")
-    closeBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -4, -4)
+    local title = UI.Text(header, "title", "CurrencyInfo")
+    title:SetPoint("LEFT", header, "LEFT", 16, 0)
+    UI.AccentText(title)
+    local sub = Caption(header, "Settings")
+    sub:SetPoint("LEFT", title, "RIGHT", 10, -1)
+
+    local closeBtn = UI.CloseButton(header, 28)
+    closeBtn:SetPoint("RIGHT", header, "RIGHT", -8, 0)
     closeBtn:SetScript("OnClick", function() f:Hide() end)
 
-    Separator(f, -34)
+    local swatch = UI.ColorSwatch(header,
+        function() return UI.accent.r, UI.accent.g, UI.accent.b end,
+        function(r, g, b)
+            UI.SetAccent(r, g, b)
+            CI.db.accent = { r, g, b }
+        end, 20)
+    swatch:SetPoint("RIGHT", closeBtn, "LEFT", -10, 0)
+    self.accentSwatch = swatch
+    local swLbl = Caption(header, "Accent")
+    swLbl:SetPoint("RIGHT", swatch, "LEFT", -8, 0)
+
+    UI.Divider(f, -45, 1)
 
     -- ---- Add Currency ----
-    local addLabel = Label(f, "Add Currency:", 11)
-    addLabel:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -46)
-    addLabel:SetTextColor(0.85, 0.85, 0.85)
+    local addLabel = Caption(f, "Add currency")
+    addLabel:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -62)
 
-    local idBox = EditBox(f, 100, 24)
-    idBox:SetPoint("TOPLEFT", f, "TOPLEFT", 108, -44)
-    idBox.editBox:SetNumeric(true)
-    idBox.editBox:SetMaxLetters(10)
+    local browseBtn = Button(f, "Browse list...", 130, 26)
+    browseBtn:SetPoint("TOPLEFT", f, "TOPLEFT", 112, -57)
+    browseBtn:SetScript("OnClick", function() CI:OpenPicker() end)
+
+    local orLbl = Caption(f, "or ID")
+    orLbl:SetPoint("LEFT", browseBtn, "RIGHT", 12, 0)
+
+    local idBox = EditBox(f, 90, 26)
+    idBox:SetPoint("LEFT", orLbl, "RIGHT", 8, 0)
+    idBox:SetNumeric(true)
+    idBox:SetMaxLetters(10)
 
     -- Placeholder
-    local idPlaceholder = f:CreateFontString(nil, "OVERLAY")
-    idPlaceholder:SetFont("Fonts\\FRIZQT__.TTF", 11, "")
-    idPlaceholder:SetPoint("LEFT", idBox, "LEFT", 6, 0)
-    idPlaceholder:SetText("Currency ID")
-    idPlaceholder:SetTextColor(0.45, 0.45, 0.45)
-    idBox.editBox:SetScript("OnEditFocusGained", function() idPlaceholder:Hide() end)
-    idBox.editBox:SetScript("OnEditFocusLost",   function(self)
+    local idPlaceholder = UI.Text(idBox, "small", "Currency ID")
+    idPlaceholder:SetPoint("LEFT", idBox, "LEFT", 8, 0)
+    idPlaceholder:SetAlpha(0.7)
+    idBox:HookScript("OnEditFocusGained", function() idPlaceholder:Hide() end)
+    idBox:HookScript("OnEditFocusLost",   function(self)
         if self:GetText() == "" then idPlaceholder:Show() end
     end)
 
-    local addBtn = Button(f, "Add", 60, 24)
+    local addBtn = Button(f, "Add", 56, 26)
     addBtn:SetPoint("LEFT", idBox, "RIGHT", 6, 0)
 
     -- Preview / feedback label
-    local feedback = f:CreateFontString(nil, "OVERLAY")
-    feedback:SetFont("Fonts\\FRIZQT__.TTF", 11, "")
-    feedback:SetPoint("LEFT", addBtn, "RIGHT", 10, 0)
+    local feedback = UI.Text(f, "body")
+    feedback:SetPoint("LEFT", addBtn, "RIGHT", 12, 0)
     feedback:SetText("")
+    self.cfgFeedback = feedback
 
-    idBox.editBox:SetScript("OnTextChanged", function(self)
+    idBox:SetScript("OnTextChanged", function(self)
         local id = tonumber(self:GetText())
         if id then
             local data = ns.GetCurrencyData(id)
             if data then
-                feedback:SetText(data.name)
-                feedback:SetTextColor(0.5, 1, 0.5)
+                CI:SetFeedback(data.name, 0.5, 1, 0.5)
             else
-                feedback:SetText("Unknown ID")
-                feedback:SetTextColor(1, 0.4, 0.4)
+                CI:SetFeedback("Unknown ID", 1, 0.4, 0.4)
             end
         else
-            feedback:SetText("")
+            CI:SetFeedback("")
         end
     end)
 
     local function DoAdd()
-        local id = tonumber(idBox.editBox:GetText())
+        local id = tonumber(idBox:GetText())
         if not id then return end
-        for _, c in ipairs(CI.db.currencies) do
-            if c.id == id then
-                feedback:SetText("Already tracked!")
-                feedback:SetTextColor(1, 0.8, 0)
-                return
-            end
+        local ok, msg = CI:AddCurrency(id)
+        if ok then
+            idBox:SetText("")
+            idPlaceholder:Show()
+            CI:SetFeedback("Added: " .. msg, 0.5, 1, 0.5)
+        elseif msg == "Already tracked!" then
+            CI:SetFeedback(msg, 1, 0.8, 0)
+        else
+            CI:SetFeedback(msg, 1, 0.4, 0.4)
         end
-        local data = ns.GetCurrencyData(id)
-        if not data then
-            feedback:SetText("Invalid currency ID")
-            feedback:SetTextColor(1, 0.4, 0.4)
-            return
-        end
-        local newCurr = {}
-        DeepMerge(newCurr, ns.CURRENCY_DEFAULTS)
-        newCurr.id = id
-        table.insert(CI.db.currencies, newCurr)
-        idBox.editBox:SetText("")
-        idPlaceholder:Show()
-        feedback:SetText("Added: " .. data.name)
-        feedback:SetTextColor(0.5, 1, 0.5)
-        CI:RefreshDisplay()
-        CI:RefreshConfigCurrencyList()
     end
 
     addBtn:SetScript("OnClick", DoAdd)
-    idBox.editBox:SetScript("OnEnterPressed", function(self)
+    idBox:SetScript("OnEnterPressed", function(self)
         DoAdd()
         self:ClearFocus()
     end)
 
-    Separator(f, -78)
+    Separator(f, -96)
 
     -- ---- Currency List header ----
-    local listLabel = Label(f, "Tracked Currencies:", 11)
-    listLabel:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -88)
-    listLabel:SetTextColor(0.85, 0.85, 0.85)
-
-    -- Token reference tooltip on the label
-    listLabel:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:SetText("Custom Template Tokens", 1, 0.82, 0)
-        GameTooltip:AddLine("{label}    — custom label or currency name", 1, 1, 1)
-        GameTooltip:AddLine("{current}  — current quantity",              1, 1, 1)
-        GameTooltip:AddLine("{max}      — maximum quantity",              1, 1, 1)
-        GameTooltip:AddLine("{earned}   — total earned",                  1, 1, 1)
-        GameTooltip:AddLine("{left}     — left to earn (max − earned)",   1, 1, 1)
-        GameTooltip:AddLine("{weekly}   — earned this week",              1, 1, 1)
-        GameTooltip:AddLine("{weeklycap}— weekly cap",                    1, 1, 1)
-        GameTooltip:AddLine("{pct}      — percentage current/max",        1, 1, 1)
-        GameTooltip:Show()
-    end)
-    listLabel:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    local listLabel = Caption(f, "Tracked currencies  (drag to reorder, hover for template tokens)")
+    listLabel:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -108)
+    listLabel:SetScript("OnEnter", ShowTokenTooltip)
+    listLabel:SetScript("OnLeave", HideTooltip)
     listLabel:EnableMouse(true)
 
     -- Column headers
-    local hdrY = -104
+    local hdrY = -130
     local function ColHdr(text, x)
-        local lbl = f:CreateFontString(nil, "OVERLAY")
-        lbl:SetFont("Fonts\\FRIZQT__.TTF", 10, "")
+        local lbl = Caption(f, text)
         lbl:SetPoint("TOPLEFT", f, "TOPLEFT", 16 + x, hdrY)
-        lbl:SetText(text)
-        lbl:SetTextColor(0.6, 0.6, 0.6)
     end
-    ColHdr("",             COL_ICON)
-    ColHdr("Name",         COL_NAME)
-    ColHdr("No label",         COL_NOLABEL)
-    ColHdr("Custom Label", COL_LABEL)
-    ColHdr("Format",       COL_FMT)
-    ColHdr("Template",     COL_TEMPLATE)
-    ColHdr("Icon",         COL_ICON_CB)
+    ColHdr("Name",     COL_NAME)
+    ColHdr("No label", COL_NOLABEL)
+    ColHdr("Label",    COL_LABEL)
+    ColHdr("Format",   COL_FMT)
+    ColHdr("Template", COL_TEMPLATE)
+    ColHdr("Preview",  COL_PREVIEW)
+    ColHdr("Icon",     COL_ICON_CB)
 
     -- Scroll frame for currency rows
-    local scrollFrame = CreateFrame("ScrollFrame", "CIConfigScroll", f, "UIPanelScrollFrameTemplate")
-    scrollFrame:SetPoint("TOPLEFT",     f, "TOPLEFT",     16, -120)
-    scrollFrame:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -36, 112)
+    local dsTop = BOTTOM_PAD + DS_H
+    local scrollFrame = UI.ScrollFrame(f)
+    scrollFrame:SetPoint("TOPLEFT",     f, "TOPLEFT",     16, -148)
+    scrollFrame:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -30, dsTop + 38)
     self.cfgScroll = scrollFrame
 
-    local scrollContent = CreateFrame("Frame", "CIConfigScrollContent", scrollFrame)
-    scrollContent:SetWidth(scrollFrame:GetWidth() - 4)
+    local scrollContent = CreateFrame("Frame", nil, scrollFrame)
+    scrollContent:SetWidth(CFG_W - 46)
     scrollContent:SetHeight(60)
     scrollFrame:SetScrollChild(scrollContent)
     self.cfgContent = scrollContent
 
-    Separator(f, -448)
+    -- Empty state: shown inside the list while nothing is tracked
+    local empty = CreateFrame("Frame", nil, scrollContent)
+    empty:SetPoint("TOPLEFT",  scrollContent, "TOPLEFT",  0, 0)
+    empty:SetPoint("TOPRIGHT", scrollContent, "TOPRIGHT", 0, 0)
+    empty:SetHeight(140)
+    local emptyText = UI.Text(empty, "body", "No currencies tracked yet.")
+    emptyText:SetPoint("TOP", empty, "TOP", 0, -28)
+    local emptySub = UI.Text(empty, "small", "Pick from a list, add an ID above, or start with every currency that has a cap.")
+    emptySub:SetPoint("TOP", emptyText, "BOTTOM", 0, -8)
+    local emptyBrowse = Button(empty, "Browse currencies", 170, 28)
+    emptyBrowse:SetPoint("TOP", empty, "TOP", -95, -80)
+    emptyBrowse:SetScript("OnClick", function() CI:OpenPicker() end)
+    local emptyCapped = Button(empty, "Add all capped currencies", 190, 28)
+    emptyCapped:SetPoint("LEFT", emptyBrowse, "RIGHT", 10, 0)
+    emptyCapped:SetScript("OnClick", function()
+        local n = CI:AddAllCapped()
+        CI:SetFeedback(n > 0 and ("Added " .. n .. " capped currencies") or "No capped currencies found", 0.5, 1, 0.5)
+    end)
+    empty:Hide()
+    self.cfgEmpty = empty
+
+    Separator(f, -(CFG_H - (dsTop + 30)))
 
     -- ---- Display Settings ----
-    local dsLabel = Label(f, "Display Settings:", 11)
-    dsLabel:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 16, 95)
-    dsLabel:SetTextColor(0.85, 0.85, 0.85)
+    local dsLabel = Caption(f, "Display settings")
+    dsLabel:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 16, dsTop + 8)
 
     local dsFrame = CreateFrame("Frame", nil, f)
-    dsFrame:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  16, 14)
-    dsFrame:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -16, 14)
-    dsFrame:SetHeight(80)
+    dsFrame:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  16, BOTTOM_PAD)
+    dsFrame:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -16, BOTTOM_PAD)
+    dsFrame:SetHeight(DS_H)
     self:BuildDisplaySettings(dsFrame)
 end
 
@@ -323,269 +299,569 @@ end
 -- ============================================================
 
 function CI:BuildDisplaySettings(p)
-    local layout = self.db.layout
     local db     = self.db
+    local layout = db.layout
+    local vis    = db.visibility
 
-    -- Row 1: Layout direction, Font face, Font size
-    local dirLbl = Label(p, "Layout:", 11); dirLbl:SetPoint("TOPLEFT", p, "TOPLEFT", 0, 0); dirLbl:SetTextColor(0.85,0.85,0.85)
+    -- Each control registers a function that re-reads its value (used after a reset).
+    local refreshers = {}
+    self.dsRefreshers = refreshers
 
-    local colBtn = Button(p, "Column", 70, 22); colBtn:SetPoint("TOPLEFT", p, "TOPLEFT", 56, 2)
-    local rowBtn = Button(p, "Row",    70, 22); rowBtn:SetPoint("TOPLEFT", p, "TOPLEFT", 130, 2)
-
-    local function UpdateDirBtns()
-        if layout.direction == "column" then
-            colBtn:SetNormalFontObject(GameFontHighlight)
-            rowBtn:SetNormalFontObject(GameFontNormal)
-        else
-            colBtn:SetNormalFontObject(GameFontNormal)
-            rowBtn:SetNormalFontObject(GameFontHighlight)
-        end
+    -- Row 1: layout direction, alignment, font, reset
+    local dirLbl = Caption(p, "Layout"); dirLbl:SetPoint("TOPLEFT", p, "TOPLEFT", 0, -7)
+    local colBtn = Button(p, "Column", 70, 24); colBtn:SetPoint("TOPLEFT", p, "TOPLEFT", 56, 0)
+    local rowBtn = Button(p, "Row",    70, 24); rowBtn:SetPoint("TOPLEFT", p, "TOPLEFT", 132, 0)
+    local function UpdateDir()
+        colBtn:SetSelected(layout.direction == "column")
+        rowBtn:SetSelected(layout.direction ~= "column")
     end
-    UpdateDirBtns()
-    colBtn:SetScript("OnClick", function() layout.direction = "column"; UpdateDirBtns(); CI:RefreshDisplay() end)
-    rowBtn:SetScript("OnClick", function() layout.direction = "row";    UpdateDirBtns(); CI:RefreshDisplay() end)
+    UpdateDir()
+    refreshers[#refreshers + 1] = UpdateDir
+    colBtn:SetScript("OnClick", function() layout.direction = "column"; UpdateDir(); CI:RefreshDisplay() end)
+    rowBtn:SetScript("OnClick", function() layout.direction = "row";    UpdateDir(); CI:RefreshDisplay() end)
 
-    local fontLbl = Label(p, "Font:", 11); fontLbl:SetPoint("TOPLEFT", p, "TOPLEFT", 218, 0); fontLbl:SetTextColor(0.85,0.85,0.85)
-    local fontDD = DropDown(p, 156, ns.GetFontOptions(), layout.fontFace, function(opt)
+    local alignLbl = Caption(p, "Align"); alignLbl:SetPoint("TOPLEFT", p, "TOPLEFT", 222, -7)
+    local leftBtn  = Button(p, "Left",  56, 24); leftBtn:SetPoint("TOPLEFT",  p, "TOPLEFT", 266, 0)
+    local rightBtn = Button(p, "Right", 56, 24); rightBtn:SetPoint("TOPLEFT", p, "TOPLEFT", 328, 0)
+    local function UpdateAlign()
+        leftBtn:SetSelected(layout.align ~= "right")
+        rightBtn:SetSelected(layout.align == "right")
+    end
+    UpdateAlign()
+    refreshers[#refreshers + 1] = UpdateAlign
+    leftBtn:SetScript("OnClick",  function() layout.align = "left";  UpdateAlign(); CI:RefreshDisplay() end)
+    rightBtn:SetScript("OnClick", function() layout.align = "right"; UpdateAlign(); CI:RefreshDisplay() end)
+    local function AlignTip(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:SetText("Text alignment (column layout)", 1, 1, 1)
+        GameTooltip:AddLine("Right-align lines up the values.", 0.8, 0.8, 0.8)
+        GameTooltip:Show()
+    end
+    for _, b in ipairs({ leftBtn, rightBtn }) do
+        b:HookScript("OnEnter", AlignTip)
+        b:HookScript("OnLeave", HideTooltip)
+    end
+
+    local fontLbl = Caption(p, "Font"); fontLbl:SetPoint("TOPLEFT", p, "TOPLEFT", 420, -7)
+    local fontDD = DropDown(p, 190, ns.GetFontOptions(), layout.fontFace, function(opt)
         layout.fontFace = opt.id
         CI:RefreshDisplay()
-    end, 300)
-    fontDD:SetPoint("TOPLEFT", p, "TOPLEFT", 252, 2)
+    end, 300, true)
+    fontDD:SetPoint("TOPLEFT", p, "TOPLEFT", 458, 0)
+    refreshers[#refreshers + 1] = function() fontDD:SetCurrentId(layout.fontFace) end
 
-    local fsLbl = Label(p, "Font Size:", 11); fsLbl:SetPoint("TOPLEFT", p, "TOPLEFT", 422, 0); fsLbl:SetTextColor(0.85,0.85,0.85)
-    local fsBox = EditBox(p, 44, 22); fsBox:SetPoint("TOPLEFT", p, "TOPLEFT", 494, 2)
-    fsBox.editBox:SetNumeric(true)
-    fsBox.editBox:SetText(tostring(layout.fontSize))
-    fsBox.editBox:SetScript("OnEnterPressed", function(self)
-        local v = tonumber(self:GetText())
-        if v and v >= 6 and v <= 48 then layout.fontSize = v; CI:RefreshDisplay() end
-        self:ClearFocus()
+    local resetBtn = Button(p, "Reset to defaults", 140, 24)
+    resetBtn:SetPoint("TOPRIGHT", p, "TOPRIGHT", 0, 0)
+    resetBtn:SetScript("OnClick", function()
+        wipe(layout); DeepMerge(layout, ns.DB_DEFAULTS.layout)
+        wipe(vis);    DeepMerge(vis,    ns.DB_DEFAULTS.visibility)
+        db.showGains = true
+        db.accent = nil
+        UI.SetAccent(unpack(UI.DEFAULT_ACCENT))
+        CI:RefreshDisplaySettingsUI()
+        CI:ApplyVisibilityRules()
+        CI:RefreshDisplay()
     end)
+    resetBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:SetText("Resets layout, visibility rules and accent color.", 1, 1, 1)
+        GameTooltip:AddLine("Tracked currencies and position are kept.", 0.8, 0.8, 0.8)
+        GameTooltip:Show()
+    end)
+    resetBtn:SetScript("OnLeave", HideTooltip)
 
-    -- Row 2: Icon size, Spacing, Background, Lock
-    local iconLbl = Label(p, "Icon Size:", 11); iconLbl:SetPoint("TOPLEFT", p, "TOPLEFT", 0, -30); iconLbl:SetTextColor(0.85,0.85,0.85)
-    local iconBox = EditBox(p, 44, 22); iconBox:SetPoint("TOPLEFT", p, "TOPLEFT", 70, -28)
-    iconBox.editBox:SetNumeric(true)
-    iconBox.editBox:SetText(tostring(layout.iconSize))
-    iconBox.editBox:SetScript("OnEnterPressed", function(self)
-        local v = tonumber(self:GetText())
-        if v and v >= 8 and v <= 64 then layout.iconSize = v; CI:RefreshDisplay() end
-        self:ClearFocus()
-    end)
+    -- Rows 2-3: sliders
+    local function SliderCell(x, y, text, minV, maxV, step, key, fmt)
+        local cap = Caption(p, text); cap:SetPoint("TOPLEFT", p, "TOPLEFT", x, y - 4)
+        local s = UI.Slider(p, 120, minV, maxV, step, layout[key], function(v)
+            layout[key] = v
+            CI:RefreshDisplay()
+        end, fmt)
+        s:SetPoint("TOPLEFT", p, "TOPLEFT", x + 84, y - 4)
+        refreshers[#refreshers + 1] = function() s:SetValueSilent(layout[key]) end
+    end
+    local pct = function(v) return math.floor(v * 100 + 0.5) .. "%" end
 
-    local spcLbl = Label(p, "Spacing:", 11); spcLbl:SetPoint("TOPLEFT", p, "TOPLEFT", 124, -30); spcLbl:SetTextColor(0.85,0.85,0.85)
-    local spcBox = EditBox(p, 44, 22); spcBox:SetPoint("TOPLEFT", p, "TOPLEFT", 186, -28)
-    spcBox.editBox:SetNumeric(true)
-    spcBox.editBox:SetText(tostring(layout.spacing))
-    spcBox.editBox:SetScript("OnEnterPressed", function(self)
-        local v = tonumber(self:GetText())
-        if v and v >= 0 and v <= 60 then layout.spacing = v; CI:RefreshDisplay() end
-        self:ClearFocus()
-    end)
+    SliderCell(0,   -34, "Font size", 6,   48, 1,    "fontSize")
+    SliderCell(276, -34, "Icon size", 8,   64, 1,    "iconSize")
+    SliderCell(552, -34, "Spacing",   0,   60, 1,    "spacing")
+    SliderCell(0,   -68, "Scale",     0.5, 2,  0.05, "scale",   function(v) return string.format("%.2fx", v) end)
+    SliderCell(276, -68, "Bg opacity", 0,  1,  0.05, "bgAlpha", pct)
+    SliderCell(552, -68, "Padding",   0,   30, 1,    "padding")
 
-    local bgCb = Checkbox(p, layout.showBackground, "Background", function(checked)
-        layout.showBackground = checked
-        CI:UpdateBackdrop()
-    end)
-    bgCb:SetPoint("TOPLEFT", p, "TOPLEFT", 244, -28)
+    -- Rows 4-5: toggles
+    local function Toggle(x, y, text, get, set)
+        local cb = Checkbox(p, get(), text, set)
+        cb:SetPoint("TOPLEFT", p, "TOPLEFT", x, y)
+        refreshers[#refreshers + 1] = function() cb:SetState(get()) end
+    end
 
-    local lockCb = Checkbox(p, db.locked, "Lock Position", function(checked)
-        db.locked = checked
-    end)
-    lockCb:SetPoint("TOPLEFT", p, "TOPLEFT", 380, -28)
+    Toggle(0,   -102, "Background",    function() return layout.showBackground end,
+        function(v) layout.showBackground = v; CI:RefreshDisplay() end)
+    Toggle(200, -102, "Lock position", function() return db.locked end,
+        function(v) db.locked = v end)
+    Toggle(400, -102, "Show display",  function() return not db.hidden end,
+        function(v) db.hidden = not v; CI:UpdateVisibility() end)
+    Toggle(600, -102, "Gain / loss text", function() return db.showGains end,
+        function(v) db.showGains = v; CI:RefreshDisplay() end)
+
+    Toggle(0,   -134, "Hide in combat", function() return vis.hideInCombat end,
+        function(v) vis.hideInCombat = v; CI:ApplyVisibilityRules() end)
+    Toggle(200, -134, "Hide on Currency tab", function() return vis.hideOnCurrencyTab end,
+        function(v) vis.hideOnCurrencyTab = v; CI:ApplyVisibilityRules() end)
+    Toggle(400, -134, "Fade when not hovered", function() return vis.fadeIdle end,
+        function(v) vis.fadeIdle = v; CI:ApplyVisibilityRules() end)
+end
+
+function CI:RefreshDisplaySettingsUI()
+    for _, fn in ipairs(self.dsRefreshers or {}) do fn() end
+    if self.accentSwatch then self.accentSwatch.Refresh() end
 end
 
 -- ============================================================
--- Currency list rows
+-- Per-currency options popup (text color, cap behaviour)
 -- ============================================================
 
-function CI:BuildCurrencyRow(parent, index, currSettings)
-    local data = ns.GetCurrencyData(currSettings.id)
-    if not data then return end
+local function BuildOptionsPopup()
+    local cfg = CI.configFrame
+    local p = CreateFrame("Frame", nil, cfg)
+    p:SetSize(400, 280)
+    p:SetPoint("CENTER", cfg, "CENTER", 0, 0)
+    p:SetFrameLevel(cfg:GetFrameLevel() + 60)
+    p:EnableMouse(true)
+    UI.Surface(p, UI.Colors.popup, { 1, 1, 1, 0.18 })
+    UI.FadeInOnShow(p)
+    p:Hide()
+    cfg:HookScript("OnHide", function() p:Hide() end)
 
+    local title = UI.Text(p, "title", "")
+    title:SetPoint("TOPLEFT", p, "TOPLEFT", 16, -14)
+    title:SetWidth(330)
+    title:SetJustifyH("LEFT")
+    title:SetWordWrap(false)
+    UI.AccentText(title)
+    local closeBtn = UI.CloseButton(p, 26)
+    closeBtn:SetPoint("TOPRIGHT", p, "TOPRIGHT", -8, -10)
+    closeBtn:SetScript("OnClick", function() p:Hide() end)
+
+    local function Changed()
+        if p.row then p.row:UpdatePreview(); p.row:UpdateMarker() end
+        CI:RefreshDisplay()
+    end
+
+    local function RowLabel(text, y)
+        local c = Caption(p, text)
+        c:SetPoint("TOPLEFT", p, "TOPLEFT", 16, y - 5)
+        return c
+    end
+
+    -- Text color
+    RowLabel("Text color", -56)
+    local textSwatch = UI.ColorSwatch(p,
+        function()
+            local c = p.cur and p.cur.textColor
+            if c then return c[1], c[2], c[3] end
+            return 1, 1, 1
+        end,
+        function(r, g, b) p.cur.textColor = { r, g, b }; Changed() end, 22)
+    textSwatch:SetPoint("TOPLEFT", p, "TOPLEFT", 150, -56)
+    local textReset = Button(p, "Reset", 60, 22)
+    textReset:SetPoint("LEFT", textSwatch, "RIGHT", 10, 0)
+    textReset:SetScript("OnClick", function()
+        p.cur.textColor = nil
+        textSwatch.Refresh()
+        Changed()
+    end)
+
+    -- When capped
+    RowLabel("When capped", -94)
+    local capDD = DropDown(p, 170, ns.CAP_ACTIONS, "none", function(opt)
+        p.cur.capAction = opt.id
+        p:UpdateEnabled()
+        Changed()
+    end)
+    capDD:SetPoint("TOPLEFT", p, "TOPLEFT", 150, -94)
+
+    -- Cap color
+    local capColorLbl = RowLabel("Cap color", -132)
+    local capSwatch = UI.ColorSwatch(p,
+        function()
+            local c = p.cur and p.cur.capColor or { 0.3, 1, 0.5 }
+            return c[1], c[2], c[3]
+        end,
+        function(r, g, b) p.cur.capColor = { r, g, b }; Changed() end, 22)
+    capSwatch:SetPoint("TOPLEFT", p, "TOPLEFT", 150, -132)
+
+    -- Threshold
+    local thrLbl = RowLabel("Capped at", -170)
+    local thr = UI.Slider(p, 150, 50, 100, 5, 100, function(v)
+        p.cur.capThreshold = v
+        Changed()
+    end, function(v) return v .. "%" end)
+    thr:SetPoint("TOPLEFT", p, "TOPLEFT", 150, -170)
+
+    local hint = UI.Text(p, "small",
+        "Capped means current / max (or total earned / max, or weekly earned / weekly cap, whichever is highest) has reached this percentage.")
+    hint:SetPoint("TOPLEFT", p, "TOPLEFT", 16, -212)
+    hint:SetWidth(368)
+    hint:SetJustifyH("LEFT")
+
+    function p:UpdateEnabled()
+        local action = self.cur.capAction
+        local colorOn = action == "color"
+        capColorLbl:SetAlpha(colorOn and 1 or 0.35)
+        capSwatch:SetAlpha(colorOn and 1 or 0.35)
+        capSwatch:EnableMouse(colorOn)
+        local anyOn = action ~= "none"
+        thrLbl:SetAlpha(anyOn and 1 or 0.35)
+        thr:SetAlpha(anyOn and 1 or 0.35)
+        thr:EnableMouse(anyOn)
+    end
+
+    function p:Load(row)
+        self.row, self.cur = row, row.cur
+        title:SetText(row.data and row.data.name or ("Currency " .. row.cur.id))
+        textSwatch.Refresh()
+        capSwatch.Refresh()
+        capDD:SetCurrentId(row.cur.capAction)
+        thr:SetValueSilent(row.cur.capThreshold)
+        self:UpdateEnabled()
+    end
+
+    return p
+end
+
+function CI:OpenRowOptions(row)
+    if not self.optionsPopup then self.optionsPopup = BuildOptionsPopup() end
+    local p = self.optionsPopup
+    if p:IsShown() and p.row == row then p:Hide() return end
+    p:Load(row)
+    p:Show()
+end
+
+-- ============================================================
+-- Currency list rows (pooled; SetData rebinds a row to a currency)
+-- ============================================================
+
+local function SmallBtn(row, x, tex, tooltip, onClick)
+    local b = CreateFrame("Button", nil, row)
+    b:SetSize(18, 18)
+    b:SetPoint("LEFT", row, "LEFT", x, 0)
+    b:SetNormalTexture(tex)
+    b:GetNormalTexture():SetVertexColor(1, 1, 1, 0.55)
+    b:SetHighlightTexture(tex, "ADD")
+    UI.OnAccent(function(r, g, bl) b:GetHighlightTexture():SetVertexColor(r, g, bl, 0.9) end)
+    b:SetScript("OnClick", onClick)
+    b:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText(tooltip, 1, 1, 1)
+        GameTooltip:Show()
+    end)
+    b:SetScript("OnLeave", HideTooltip)
+    return b
+end
+
+local function BuildRow(parent, index)
     local row = CreateFrame("Frame", nil, parent)
     row:SetSize(parent:GetWidth(), ROW_H)
-    row:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, -((index - 1) * (ROW_H + ROW_PAD)))
+    row.baseLevel = row:GetFrameLevel()
+    UI.RowStripe(row, index)
 
-    -- Alternating row bg
-    if index % 2 == 0 then
-        local bg = row:CreateTexture(nil, "BACKGROUND")
-        bg:SetAllPoints()
-        bg:SetColorTexture(1, 1, 1, 0.04)
+    -- Drag handle
+    local grip = CreateFrame("Button", nil, row)
+    grip:SetSize(16, ROW_H)
+    grip:SetPoint("LEFT", row, "LEFT", COL_GRIP, 0)
+    local bars = {}
+    for k = -1, 1 do
+        local bar = grip:CreateTexture(nil, "ARTWORK")
+        bar:SetSize(10, 2)
+        bar:SetPoint("CENTER", grip, "CENTER", 0, k * 4)
+        bar:SetColorTexture(1, 1, 1, 0.3)
+        bars[#bars + 1] = bar
     end
+    local function GripAlpha(a) for _, b in ipairs(bars) do b:SetAlpha(a) end end
+    grip:SetScript("OnEnter", function(self)
+        GripAlpha(2.5)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText("Drag to reorder", 1, 1, 1)
+        GameTooltip:Show()
+    end)
+    grip:SetScript("OnLeave", function() GripAlpha(1); GameTooltip:Hide() end)
+
+    local function DragUpdate()
+        local content = row:GetParent()
+        local offset = content:GetTop() - select(2, GetCursorPosition()) / content:GetEffectiveScale()
+        local n = #CI.db.currencies
+        local y = math.max(0, math.min((n - 1) * (ROW_H + ROW_PAD), offset - ROW_H / 2))
+        row:ClearAllPoints()
+        row:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -y)
+        row.dropIndex = math.max(1, math.min(n, math.floor(offset / (ROW_H + ROW_PAD)) + 1))
+    end
+    local function EndDrag()
+        if not row.dragging then return end
+        row.dragging = false
+        row:SetScript("OnUpdate", nil)
+        row:SetAlpha(1)
+        row:SetFrameLevel(row.baseLevel)
+        local from, to = row.index, row.dropIndex
+        if to and to ~= from then
+            local t = CI.db.currencies
+            table.insert(t, to, table.remove(t, from))
+            CI:RefreshDisplay()
+        end
+        CI:RefreshConfigCurrencyList()
+    end
+    grip:SetScript("OnMouseDown", function(_, btn)
+        if btn ~= "LeftButton" then return end
+        row.dragging, row.dropIndex = true, row.index
+        row:SetFrameLevel(row.baseLevel + 20)
+        row:SetAlpha(0.85)
+        row:SetScript("OnUpdate", DragUpdate)
+    end)
+    grip:SetScript("OnMouseUp", EndDrag)
+    grip:SetScript("OnHide", EndDrag)
 
     -- Icon
-    if data.iconFileID then
-        local icon = row:CreateTexture(nil, "ARTWORK")
-        icon:SetSize(20, 20)
-        icon:SetPoint("LEFT", row, "LEFT", COL_ICON, 0)
-        icon:SetTexture(data.iconFileID)
-        icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-    end
+    local icon = row:CreateTexture(nil, "ARTWORK")
+    icon:SetSize(20, 20)
+    icon:SetPoint("LEFT", row, "LEFT", COL_ICON, 0)
+    icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 
     -- Name
-    local nameLbl = row:CreateFontString(nil, "OVERLAY")
-    nameLbl:SetFont("Fonts\\FRIZQT__.TTF", 11, "")
+    local nameLbl = UI.Text(row, "body")
     nameLbl:SetPoint("LEFT", row, "LEFT", COL_NAME, 0)
     nameLbl:SetWidth(COL_NOLABEL - COL_NAME - 4)
-    nameLbl:SetText(data.name)
-    nameLbl:SetTextColor(0.9, 0.9, 0.9)
     nameLbl:SetJustifyH("LEFT")
     nameLbl:SetWordWrap(false)
 
-    -- "None" checkbox — hide the label entirely (forward-declared so closure can reference labelBox)
-    local labelBox
-    local noLabelCb = Checkbox(row, currSettings.noLabel, nil, function(checked)
-        currSettings.noLabel = checked
-        labelBox:SetAlpha(checked and 0.35 or 1)
-        labelBox.editBox:SetEnabled(not checked)
+    -- "No label" toggle: hide the label entirely
+    local noLabelCb = Checkbox(row, false, nil, function(checked)
+        row.cur.noLabel = checked
+        row.labelBox:SetActive(not checked)
+        row:UpdatePreview()
         CI:RefreshDisplay()
     end)
     noLabelCb:SetPoint("LEFT", row, "LEFT", COL_NOLABEL, 0)
 
-    -- Custom label input
-    labelBox = EditBox(row, COL_FMT - COL_LABEL - 6, 22)
+    -- Custom label input (applies as you type)
+    local labelBox = EditBox(row, COL_FMT - COL_LABEL - 6, 24)
     labelBox:SetPoint("LEFT", row, "LEFT", COL_LABEL, 0)
-    labelBox.editBox:SetText(currSettings.customLabel or "")
-    labelBox:SetAlpha(currSettings.noLabel and 0.35 or 1)
-    labelBox.editBox:SetEnabled(not currSettings.noLabel)
-    local function SaveLabel(self)
-        currSettings.customLabel = self:GetText()
+    labelBox:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
+    labelBox:SetScript("OnTextChanged", function(self, user)
+        if not user then return end
+        row.cur.customLabel = self:GetText()
+        row:UpdatePreview()
         CI:RefreshDisplay()
-    end
-    labelBox.editBox:SetScript("OnEnterPressed", function(self) SaveLabel(self); self:ClearFocus() end)
-    labelBox.editBox:SetScript("OnEditFocusLost", SaveLabel)
+    end)
+    row.labelBox = labelBox
 
     -- Format dropdown
-    local fmtDD = DropDown(row, COL_TEMPLATE - COL_FMT - 6, FORMAT_PRESETS, currSettings.formatPreset, function(opt)
-        currSettings.formatPreset = opt.id
-        local isCustom = opt.id == "custom"
-        row.ctBox:SetAlpha(isCustom and 1 or 0.35)
-        row.ctBox.editBox:SetEnabled(isCustom)
+    local fmtDD = DropDown(row, COL_TEMPLATE - COL_FMT - 6, FORMAT_PRESETS, "current_max", function(opt)
+        row.cur.formatPreset = opt.id
+        row.ctBox:SetActive(opt.id == "custom")
+        row:UpdatePreview()
         CI:RefreshDisplay()
     end)
     fmtDD:SetPoint("LEFT", row, "LEFT", COL_FMT, 0)
 
-    -- Custom template edit box (always visible; greyed out unless "custom" is selected)
-    local isCustom = currSettings.formatPreset == "custom"
-    local ctBox = EditBox(row, COL_ICON_CB - COL_TEMPLATE - 6, 22)
+    -- Custom template (greyed out unless "Custom"; turns red on an unknown {token})
+    local ctBox = EditBox(row, COL_PREVIEW - COL_TEMPLATE - 6, 24)
     ctBox:SetPoint("LEFT", row, "LEFT", COL_TEMPLATE, 0)
-    ctBox:SetAlpha(isCustom and 1 or 0.35)
-    ctBox.editBox:SetEnabled(isCustom)
-    ctBox.editBox:SetText(currSettings.customTemplate or "")
-    ctBox.editBox:SetFontObject(ChatFontNormal)
-    local function SaveTemplate(self)
-        currSettings.customTemplate = self:GetText()
+    ctBox:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
+    ctBox:SetScript("OnTextChanged", function(self, user)
+        local bad = HasUnknownToken(self:GetText())
+        if bad then self:SetTextColor(1, 0.45, 0.45) else self:SetTextColor(1, 1, 1) end
+        if not user then return end
+        row.cur.customTemplate = self:GetText()
+        row:UpdatePreview()
         CI:RefreshDisplay()
-    end
-    ctBox.editBox:SetScript("OnEnterPressed", function(self) SaveTemplate(self); self:ClearFocus() end)
-    ctBox.editBox:SetScript("OnEditFocusLost", SaveTemplate)
-    ctBox.editBox:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:SetText("Template Tokens", 1, 0.82, 0)
-        GameTooltip:AddLine("{label}     — label or currency name", 1, 1, 1)
-        GameTooltip:AddLine("{current}   — current quantity",       1, 1, 1)
-        GameTooltip:AddLine("{max}       — maximum quantity",       1, 1, 1)
-        GameTooltip:AddLine("{earned}    — total earned",           1, 1, 1)
-        GameTooltip:AddLine("{left}      — left to earn",           1, 1, 1)
-        GameTooltip:AddLine("{weekly}    — earned this week",       1, 1, 1)
-        GameTooltip:AddLine("{weeklycap} — weekly cap",             1, 1, 1)
-        GameTooltip:AddLine("{pct}       — current/max percent",    1, 1, 1)
-        GameTooltip:Show()
     end)
-    ctBox.editBox:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    ctBox:SetScript("OnEnter", ShowTokenTooltip)
+    ctBox:SetScript("OnLeave", HideTooltip)
     row.ctBox = ctBox
 
-    -- Show Icon checkbox
-    local iconCb = Checkbox(row, currSettings.showIcon, nil, function(checked)
-        currSettings.showIcon = checked
+    -- Live preview of what the display will show
+    local preview = UI.Text(row, "body")
+    preview:SetPoint("LEFT", row, "LEFT", COL_PREVIEW, 0)
+    preview:SetWidth(COL_ICON_CB - COL_PREVIEW - 8)
+    preview:SetJustifyH("LEFT")
+    preview:SetWordWrap(false)
+
+    -- Show icon
+    local iconCb = Checkbox(row, true, nil, function(checked)
+        row.cur.showIcon = checked
         CI:RefreshDisplay()
     end)
     iconCb:SetPoint("LEFT", row, "LEFT", COL_ICON_CB, 0)
 
-    -- Up / Down / Remove buttons
-    local function SmallBtn(x, normalTex, highlightTex, tooltip, onClick)
-        local b = CreateFrame("Button", nil, row)
-        b:SetSize(18, 18)
-        b:SetPoint("LEFT", row, "LEFT", x, 0)
-        b:SetNormalTexture(normalTex)
-        b:SetHighlightTexture(highlightTex, "ADD")
-        b:SetScript("OnClick", onClick)
-        b:SetScript("OnEnter", function(self)
-            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:SetText(tooltip, 1, 1, 1)
-            GameTooltip:Show()
-        end)
-        b:SetScript("OnLeave", function() GameTooltip:Hide() end)
-        return b
+    -- Options (color / cap behaviour) and remove
+    local optsBtn = SmallBtn(row, COL_OPTS, "Interface\\Buttons\\UI-OptionsButton",
+        "Color and cap options", function() CI:OpenRowOptions(row) end)
+    SmallBtn(row, COL_DEL, "Interface\\Buttons\\UI-StopButton", "Remove", function()
+        CI:RemoveCurrency(row.cur.id)
+    end)
+
+    function row:UpdatePreview()
+        local cur = self.cur
+        if not self.data then
+            preview:SetText("-")
+            preview:SetTextColor(1, 1, 1, 0.5)
+            return
+        end
+        preview:SetText(ns.FormatCurrency(cur, self.data))
+        local c = cur.textColor
+        if c then preview:SetTextColor(c[1], c[2], c[3], 1) else preview:SetTextColor(1, 1, 1, 0.9) end
     end
 
-    local upBtn = SmallBtn(COL_UP, "Interface\\ChatFrame\\UI-ChatIcon-ScrollDown-Up",
-                                   "Interface\\ChatFrame\\UI-ChatIcon-ScrollDown-Up", "Move Up", function()
-        local t = CI.db.currencies
-        if index > 1 then t[index], t[index-1] = t[index-1], t[index]; CI:RefreshDisplay(); CI:RefreshConfigCurrencyList() end
-    end)
-    upBtn:GetNormalTexture():SetTexCoord(0, 1, 1, 0)
-    upBtn:GetHighlightTexture():SetTexCoord(0, 1, 1, 0)
+    -- Tint the options button when this currency has non-default color / cap settings.
+    function row:UpdateMarker()
+        local cur = self.cur
+        local tex = optsBtn:GetNormalTexture()
+        if cur.textColor or cur.capAction ~= "none" then
+            tex:SetVertexColor(UI.accent.r, UI.accent.g, UI.accent.b, 1)
+        else
+            tex:SetVertexColor(1, 1, 1, 0.55)
+        end
+    end
 
-    SmallBtn(COL_DOWN, "Interface\\ChatFrame\\UI-ChatIcon-ScrollDown-Up",
-                       "Interface\\ChatFrame\\UI-ChatIcon-ScrollDown-Up", "Move Down", function()
-        local t = CI.db.currencies
-        if index < #t then t[index], t[index+1] = t[index+1], t[index]; CI:RefreshDisplay(); CI:RefreshConfigCurrencyList() end
-    end)
+    function row:SetData(i, cur)
+        DeepMerge(cur, ns.CURRENCY_DEFAULTS)
+        local data = ns.GetCurrencyData(cur.id)
+        self.index, self.cur, self.data = i, cur, data
 
-    SmallBtn(COL_DEL,  "Interface\\Buttons\\UI-StopButton",
-                       "Interface\\Buttons\\UI-StopButton",               "Remove", function()
-        table.remove(CI.db.currencies, index)
-        CI:RefreshDisplay()
-        CI:RefreshConfigCurrencyList()
-    end)
+        self:ClearAllPoints()
+        self:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, -((i - 1) * (ROW_H + ROW_PAD)))
+
+        if data and data.iconFileID then
+            icon:SetTexture(data.iconFileID)
+            icon:Show()
+        else
+            icon:Hide()
+        end
+        if data then
+            nameLbl:SetText(data.name)
+            nameLbl:SetTextColor(1, 1, 1, 0.9)
+        else
+            nameLbl:SetText("Unknown (ID " .. cur.id .. ")")
+            nameLbl:SetTextColor(1, 0.4, 0.4, 1)
+        end
+
+        noLabelCb:SetState(cur.noLabel)
+        labelBox:SetText(cur.customLabel or "")
+        labelBox:SetActive(not cur.noLabel)
+        fmtDD:SetCurrentId(cur.formatPreset)
+        ctBox:SetText(cur.customTemplate or "")
+        ctBox:SetActive(cur.formatPreset == "custom")
+        iconCb:SetState(cur.showIcon)
+
+        self:UpdatePreview()
+        self:UpdateMarker()
+    end
+
+    return row
 end
 
 function CI:RefreshConfigCurrencyList()
     if not self.cfgContent then return end
-
-    -- Clear old rows
-    local children = { self.cfgContent:GetChildren() }
-    for _, child in ipairs(children) do
-        child:Hide()
-        child:SetParent(nil)
-    end
-    -- Also clear any font strings (hint text)
-    self.cfgContent.hintText = nil
+    self.cfgRows = self.cfgRows or {}
 
     local currencies = self.db.currencies
-    if #currencies == 0 then
-        if not self.cfgContent.hintText then
-            local hint = self.cfgContent:CreateFontString(nil, "OVERLAY")
-            hint:SetFont("Fonts\\FRIZQT__.TTF", 11, "")
-            hint:SetText("No currencies tracked yet. Enter a currency ID above and click Add.")
-            hint:SetTextColor(0.5, 0.5, 0.5)
-            hint:SetPoint("CENTER", self.cfgContent, "CENTER", 0, 0)
-            self.cfgContent.hintText = hint
+    for i, cur in ipairs(currencies) do
+        local row = self.cfgRows[i]
+        if not row then
+            row = BuildRow(self.cfgContent, i)
+            self.cfgRows[i] = row
         end
-        self.cfgContent:SetHeight(60)
-        return
+        row:SetData(i, cur)
+        row:Show()
+    end
+    for i = #currencies + 1, #self.cfgRows do
+        self.cfgRows[i]:Hide()
     end
 
-    for i, currSettings in ipairs(currencies) do
-        self:BuildCurrencyRow(self.cfgContent, i, currSettings)
+    -- The options popup may point at a row that moved or was removed.
+    if self.optionsPopup and self.optionsPopup:IsShown() then self.optionsPopup:Hide() end
+
+    if #currencies == 0 then
+        self.cfgEmpty:Show()
+        self.cfgContent:SetHeight(140)
+    else
+        self.cfgEmpty:Hide()
+        self.cfgContent:SetHeight(#currencies * (ROW_H + ROW_PAD) + ROW_PAD)
     end
-    self.cfgContent:SetHeight(math.max(#currencies * (ROW_H + ROW_PAD) + ROW_PAD, 60))
 end
 
 -- ============================================================
--- Toggle config visibility
+-- Open / toggle config visibility
 -- ============================================================
 
-function CI:ToggleConfig()
+function CI:OpenConfig()
     if not self.configFrame then
         self:CreateConfigFrame()
     end
-    if self.configFrame:IsShown() then
-        self.configFrame:Hide()
-    else
+    if not self.configFrame:IsShown() then
         self:RefreshConfigCurrencyList()
         self.configFrame:Show()
     end
+end
+
+function CI:ToggleConfig()
+    if self.configFrame and self.configFrame:IsShown() then
+        self.configFrame:Hide()
+    else
+        self:OpenConfig()
+    end
+end
+
+-- ============================================================
+-- Blizzard options entry (Esc > Options > AddOns)
+-- ============================================================
+
+function CI:RegisterSettingsPanel()
+    if not (Settings and Settings.RegisterCanvasLayoutCategory) then return end
+
+    local panel = CreateFrame("Frame")
+    panel.name = "CurrencyInfo"
+
+    local title = UI.Text(panel, "title", "CurrencyInfo")
+    title:SetPoint("TOPLEFT", panel, "TOPLEFT", 16, -16)
+    UI.AccentText(title)
+    local desc = UI.Text(panel, "body", "Track and display currencies with custom formatting.\nYou can also type /ci or right-click the display.")
+    desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -10)
+    desc:SetJustifyH("LEFT")
+    local btn = Button(panel, "Open settings", 160, 28)
+    btn:SetPoint("TOPLEFT", desc, "BOTTOMLEFT", 0, -16)
+    btn:SetScript("OnClick", function()
+        if SettingsPanel and not InCombatLockdown() then HideUIPanel(SettingsPanel) end
+        CI:OpenConfig()
+    end)
+
+    local category = Settings.RegisterCanvasLayoutCategory(panel, "CurrencyInfo")
+    Settings.RegisterAddOnCategory(category)
+end
+
+-- ============================================================
+-- Shift-click a currency (Currency tab) while settings are open to track it
+-- ============================================================
+
+local function OnInsertLink(text)
+    if type(text) ~= "string" or not CI.db then return end
+    if not (CI.configFrame and CI.configFrame:IsShown()) then return end
+    -- If a chat box was active the link went there, not to us.
+    local getActive = (ChatFrameUtil and ChatFrameUtil.GetActiveWindow) or ChatEdit_GetActiveWindow
+    if getActive and getActive() then return end
+    local id = tonumber(text:match("currency:(%d+)"))
+    if not id then return end
+    local ok, msg = CI:AddCurrency(id)
+    if ok then
+        CI:SetFeedback("Added: " .. msg, 0.5, 1, 0.5)
+    else
+        CI:SetFeedback(msg, 1, 0.8, 0)
+    end
+end
+
+if ChatFrameUtil and ChatFrameUtil.InsertLink then
+    hooksecurefunc(ChatFrameUtil, "InsertLink", OnInsertLink)
+elseif ChatEdit_InsertLink then
+    hooksecurefunc("ChatEdit_InsertLink", OnInsertLink)
 end

@@ -1,10 +1,16 @@
-## Interface: 120000, 120001 
+## Interface: 120000, 120001
 ## Title: CurrencyInfo
 ## Notes: Track and display currencies with custom formatting. Right-click display or /ci to open settings.
 ## Author:
-## Version: 1.0.0
+## Version: 1.1.0
+## IconTexture: Interface\Icons\INV_Misc_Coin_01
 ## SavedVariables: CurrencyInfoDB
 ## OptionalDeps: LibSharedMedia-3.0
+## AddonCompartmentFunc: CurrencyInfo_OnAddonCompartmentClick
+## AddonCompartmentFuncOnEnter: CurrencyInfo_OnAddonCompartmentEnter
+## AddonCompartmentFuncOnLeave: CurrencyInfo_OnAddonCompartmentLeave
 
 CurrencyInfo.lua
+CurrencyInfo_UI.lua
+CurrencyInfo_Picker.lua
 CurrencyInfo_Config.lua
