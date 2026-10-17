@@ -93,6 +93,7 @@ local DB_DEFAULTS = {
         fadeIdle          = false,
     },
     position  = { point = "CENTER", x = 0, y = 0 },
+    minimap   = { hide = false, angle = 225 },
     locked    = false,
     hidden    = false,
     showGains = true,
@@ -102,6 +103,7 @@ ns.DB_DEFAULTS = DB_DEFAULTS
 ns.CURRENCY_DEFAULTS = {
     id             = 0,
     showIcon       = true,
+    hideName       = false,   -- presets only; Custom templates control this themselves
     formatPreset   = "current_max",
     customTemplate = "{label}: {current} / {max}",
     capAction      = "none",
@@ -198,7 +200,8 @@ ns.GetTemplate = GetTemplate
 
 -- The text shown for one currency (used by the display and the settings preview).
 function ns.FormatCurrency(currSettings, data)
-    return ApplyTemplate(GetTemplate(currSettings), setmetatable({ label = data.name }, { __index = data }))
+    local hide = currSettings.hideName and currSettings.formatPreset ~= "custom"
+    return ApplyTemplate(GetTemplate(currSettings), setmetatable({ label = hide and "" or data.name }, { __index = data }))
 end
 
 -- How close the currency is to its cap, 0-100+: the highest of current/max
@@ -394,18 +397,6 @@ function CI:CreateMainFrame()
     f:SetFrameLevel(10)
     self.mainFrame = f
 
-    -- Gear button (top-right corner)
-    local gear = CreateFrame("Button", nil, f)
-    gear:SetSize(14, 14)
-    gear:SetPoint("TOPRIGHT", f, "TOPRIGHT", -3, -3)
-    gear:SetNormalTexture("Interface\\Buttons\\UI-OptionsButton")
-    gear:SetHighlightTexture("Interface\\Buttons\\UI-OptionsButton", "ADD")
-    gear:SetAlpha(0.4)
-    gear:SetScript("OnEnter",    function(s) s:SetAlpha(1) end)
-    gear:SetScript("OnLeave",    function(s) s:SetAlpha(0.4) end)
-    gear:SetScript("OnMouseUp",  function(_, btn) if btn == "LeftButton" then CI:ToggleConfig() end end)
-    self.gearBtn = gear
-
     -- Hint text shown when there is nothing to display
     local hint = f:CreateFontString(nil, "OVERLAY")
     hint:SetFont("Fonts\\FRIZQT__.TTF", 11, "")
@@ -442,6 +433,76 @@ function CI:UpdateBackdrop()
         f.edge:SetColor(1, 1, 1, 0.12 * math.min(1, layout.bgAlpha + 0.25))
         f.accentBar:SetAlpha(math.max(0.35, layout.bgAlpha))
     end
+end
+
+-- ============================================================
+-- Minimap button
+-- ============================================================
+
+function CI:UpdateMinimapButton()
+    local btn, mm = self.minimapBtn, self.db.minimap
+    if not btn then return end
+    btn:SetShown(not mm.hide)
+    local a = math.rad(mm.angle)
+    local radius = Minimap:GetWidth() / 2 + 5
+    btn:ClearAllPoints()
+    btn:SetPoint("CENTER", Minimap, "CENTER", math.cos(a) * radius, math.sin(a) * radius)
+end
+
+function CI:CreateMinimapButton()
+    local btn = CreateFrame("Button", "CurrencyInfoMinimapButton", Minimap)
+    btn:SetSize(31, 31)
+    btn:SetFrameStrata("MEDIUM")
+    btn:SetFrameLevel(8)
+    btn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    btn:RegisterForDrag("LeftButton")
+    btn:SetHighlightTexture("Interface\Minimap\UI-Minimap-ZoomButton-Highlight")
+
+    local bg = btn:CreateTexture(nil, "BACKGROUND")
+    bg:SetSize(20, 20)
+    bg:SetPoint("TOPLEFT", 7, -5)
+    bg:SetTexture("Interface\Minimap\UI-Minimap-Background")
+    local icon = btn:CreateTexture(nil, "ARTWORK")
+    icon:SetSize(17, 17)
+    icon:SetPoint("TOPLEFT", 7, -6)
+    icon:SetTexture("Interface\Icons\INV_Misc_Coin_01")
+    icon:SetTexCoord(0.05, 0.95, 0.05, 0.95)
+    local border = btn:CreateTexture(nil, "OVERLAY")
+    border:SetSize(53, 53)
+    border:SetPoint("TOPLEFT")
+    border:SetTexture("Interface\Minimap\MiniMap-TrackingBorder")
+
+    btn:SetScript("OnClick", function(_, mouse)
+        if mouse == "RightButton" then
+            CI.db.hidden = not CI.db.hidden
+            CI:UpdateVisibility()
+            if CI.RefreshDisplaySettingsUI then CI:RefreshDisplaySettingsUI() end
+        else
+            CI:ToggleConfig()
+        end
+    end)
+    btn:SetScript("OnDragStart", function(self)
+        self:SetScript("OnUpdate", function()
+            local mx, my = Minimap:GetCenter()
+            local scale = Minimap:GetEffectiveScale()
+            local cx, cy = GetCursorPosition()
+            CI.db.minimap.angle = math.deg(math.atan2(cy / scale - my, cx / scale - mx))
+            CI:UpdateMinimapButton()
+        end)
+    end)
+    btn:SetScript("OnDragStop", function(self) self:SetScript("OnUpdate", nil) end)
+    btn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+        GameTooltip:SetText("CurrencyInfo")
+        GameTooltip:AddLine("Left-click: open settings", 1, 1, 1)
+        GameTooltip:AddLine("Right-click: show / hide display", 1, 1, 1)
+        GameTooltip:AddLine("Drag: move this button", 0.5, 0.5, 0.5)
+        GameTooltip:Show()
+    end)
+    btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    self.minimapBtn = btn
+    self:UpdateMinimapButton()
 end
 
 -- ============================================================
@@ -702,15 +763,14 @@ function CI:LayoutEntries()
     end
     if isCol then totalW = maxW end
 
-    local gearPad = 20
     self.mainFrame:SetSize(
-        math.max(totalW + padding * 2 + gearPad, 80),
+        math.max(totalW + padding * 2, 80),
         math.max(totalH + padding * 2 + 4,        30)
     )
 
     self.contentFrame:ClearAllPoints()
     self.contentFrame:SetPoint("TOPLEFT",     self.mainFrame, "TOPLEFT",     padding, -(padding + 4))
-    self.contentFrame:SetPoint("BOTTOMRIGHT", self.mainFrame, "BOTTOMRIGHT", -(padding + gearPad), padding)
+    self.contentFrame:SetPoint("BOTTOMRIGHT", self.mainFrame, "BOTTOMRIGHT", -padding, padding)
 end
 
 -- ============================================================
@@ -798,6 +858,7 @@ function CI:Load()
 
     self:RefreshDisplay()
     self:ApplyVisibilityRules()
+    self:CreateMinimapButton()
     if self.RegisterSettingsPanel then self:RegisterSettingsPanel() end
 
     SLASH_CURRENCYINFO1 = "/ci"
@@ -815,6 +876,10 @@ function CI:HandleSlash(msg)
         self:ToggleConfig()
     elseif cmd == "browse" then
         self:OpenPicker()
+    elseif cmd == "minimap" then
+        self.db.minimap.hide = not self.db.minimap.hide
+        self:UpdateMinimapButton()
+        Say("Minimap button " .. (self.db.minimap.hide and "|cFFFF4444hidden|r" or "|cFF44FF44shown|r"))
     elseif cmd == "lock" then
         self.db.locked = not self.db.locked
         Say("Frame " .. (self.db.locked and "|cFFFF4444locked|r" or "|cFF44FF44unlocked|r"))
@@ -850,6 +915,7 @@ function CI:HandleSlash(msg)
         print("  |cFFFFFF00/ci remove <id|name>|r — stop tracking a currency")
         print("  |cFFFFFF00/ci list|r             — list tracked currencies")
         print("  |cFFFFFF00/ci show|hide|toggle|r — show or hide the display")
+        print("  |cFFFFFF00/ci minimap|r          — show or hide the minimap button")
         print("  |cFFFFFF00/ci lock|r             — toggle frame lock")
         print("  |cFFFFFF00/ci reset|r            — reset frame position")
     end

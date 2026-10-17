@@ -13,7 +13,7 @@ A World of Warcraft addon that shows the currencies you care about in a small mo
 - Column or row layout, left or right alignment, font, sizes, spacing, scale and background opacity
 - Hide in combat, hide while the Currency tab is open, or fade when the mouse is away
 - Drag to reorder, drag to move the frame, lock it in place
-- Opens from the frame, `/ci`, the Addon Compartment button, or Esc > Options > AddOns
+- Opens with a right-click on the frame, `/ci`, the minimap button, the Addon Compartment button, or Esc > Options > AddOns
 
 ## Installation
 
@@ -27,7 +27,7 @@ Copy the `CurrencyInfo` folder into `World of Warcraft/_retail_/Interface/AddOns
 2. Click **Browse list...** and click the currencies you want. You can also type an ID and press **Add**, or click **Add all capped** to start with every currency that has a maximum.
 3. Adjust the format, label and look in the settings window.
 
-Dragging the frame moves it. Right-clicking it opens settings. The gear in its corner does the same.
+Dragging the frame moves it. Right-clicking it opens settings. The minimap button opens settings with a left-click and shows or hides the display with a right-click. You can drag it around the minimap, or hide it in the display settings or with `/ci minimap`.
 
 ## Settings
 
@@ -42,6 +42,7 @@ Each row has:
 | Custom | The template. Shows the preset's template greyed out, and becomes editable when the format is `Custom` |
 | Preview | What the display will show |
 | Icon | Show or hide the icon |
+| Hide name | Drop the currency name from the text. Presets only, so it is disabled for `Custom` |
 | Gear | Text color and cap behaviour (see below) |
 
 ### Templates
@@ -73,7 +74,7 @@ Open a row's gear button to choose what happens when a currency is capped:
 
 ### Display settings
 
-Layout, alignment, font, font size, icon size, spacing, scale, background opacity and padding, plus toggles for background, lock position, show display, gain/loss text, hide in combat, hide on Currency tab and fade when not hovered. **Reset to defaults** restores layout, visibility rules and the accent color. It keeps your tracked currencies and the frame position.
+Layout, alignment, font, font size, icon size, spacing, scale, background opacity and padding, plus toggles for background, lock position, show display, gain/loss text, hide in combat, hide on Currency tab, fade when not hovered and the minimap icon. **Reset to defaults** restores layout, visibility rules and the accent color. It keeps your tracked currencies and the frame position.
 
 The accent color of the settings window can be changed with the swatch in its header.
 
@@ -87,6 +88,7 @@ The accent color of the settings window can be changed with the swatch in its he
 | `/ci remove <id, name or link>` | Stop tracking a currency |
 | `/ci list` | List tracked currencies |
 | `/ci show`, `hide`, `toggle` | Show or hide the display |
+| `/ci minimap` | Show or hide the minimap button |
 | `/ci lock` | Lock or unlock the frame |
 | `/ci reset` | Move the frame back to the center of the screen |
 

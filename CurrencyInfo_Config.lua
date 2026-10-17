@@ -23,9 +23,10 @@ local COL_NAME     = 48
 local COL_FMT      = 204
 local COL_CUSTOM   = 360
 local COL_PREVIEW  = 556
-local COL_ICON_CB  = 700
-local COL_OPTS     = 744
-local COL_DEL      = 770
+local COL_ICON_CB  = 690
+local COL_HIDENAME = 734
+local COL_OPTS     = 778
+local COL_DEL      = 796
 
 -- ============================================================
 -- Widget helpers (thin wrappers over ns.UI)
@@ -242,6 +243,7 @@ function CI:CreateConfigFrame()
     ColHdr("Custom",   COL_CUSTOM)
     ColHdr("Preview",  COL_PREVIEW)
     ColHdr("Icon",     COL_ICON_CB)
+    ColHdr("Hide name", COL_HIDENAME)
 
     -- Scroll frame for currency rows
     local dsTop = BOTTOM_PAD + DS_H
@@ -407,6 +409,8 @@ function CI:BuildDisplaySettings(p)
         function(v) vis.hideOnCurrencyTab = v; CI:ApplyVisibilityRules() end)
     Toggle(400, -134, "Fade when not hovered", function() return vis.fadeIdle end,
         function(v) vis.fadeIdle = v; CI:ApplyVisibilityRules() end)
+    Toggle(600, -134, "Minimap icon", function() return not db.minimap.hide end,
+        function(v) db.minimap.hide = not v; CI:UpdateMinimapButton() end)
 end
 
 function CI:RefreshDisplaySettingsUI()
@@ -676,6 +680,14 @@ local function BuildRow(parent, index)
     end)
     iconCb:SetPoint("LEFT", row, "LEFT", COL_ICON_CB, 0)
 
+    -- Hide name: presets only (a Custom template decides for itself)
+    local hideCb = Checkbox(row, false, nil, function(checked)
+        row.cur.hideName = checked
+        row:UpdatePreview()
+        CI:RefreshDisplay()
+    end)
+    hideCb:SetPoint("LEFT", row, "LEFT", COL_HIDENAME, 0)
+
     -- Options (color / cap behaviour) and remove
     local optsBtn = SmallBtn(row, COL_OPTS, "Interface\\Buttons\\UI-OptionsButton",
         "Color and cap options", function() CI:OpenRowOptions(row) end)
@@ -688,6 +700,7 @@ local function BuildRow(parent, index)
         local custom = cur.formatPreset == "custom"
         ctBox:SetText(custom and (cur.customTemplate or "") or ns.GetPresetTemplate(cur.formatPreset) or "")
         ctBox:SetActive(custom)
+        hideCb:SetEnabled(not custom)
     end
 
     function row:UpdatePreview()
@@ -736,6 +749,7 @@ local function BuildRow(parent, index)
         end
 
         fmtDD:SetCurrentId(cur.formatPreset)
+        hideCb:SetState(cur.hideName)
         self:SyncTemplate()
         iconCb:SetState(cur.showIcon)
 
