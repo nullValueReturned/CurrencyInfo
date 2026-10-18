@@ -839,11 +839,10 @@ function CI:Load()
 
     if self.db.accent then ns.UI.SetAccent(unpack(self.db.accent)) end
 
-    -- Saved font may point at a path from an addon (e.g. LibSharedMedia/ElvUI)
-    -- that is no longer installed. Correct it permanently so the settings UI
-    -- doesn't keep pointing at a missing font.
-    local probe = UIParent:CreateFontString(nil, "OVERLAY")
-    if not (self.db.layout.fontFace and probe:SetFont(self.db.layout.fontFace, 12, "")) then
+    -- Don't validate/overwrite the saved font here: fonts from other addons
+    -- (LibSharedMedia/ElvUI) may not be registered yet at ADDON_LOADED.
+    -- ns.SafeSetFont falls back to the default font at render time instead.
+    if not self.db.layout.fontFace then
         self.db.layout.fontFace = ns.DEFAULT_FONT
     end
 
@@ -960,9 +959,10 @@ events:SetScript("OnEvent", function(_, event, ...)
     if not CI.db then return end
 
     if event == "CURRENCY_DISPLAY_UPDATE" then
-        local id, _, change, _, lostSource = ...
+        local id, _, change, gainSource, lostSource = ...
         if id and change and change ~= 0 and CI:FindTracked(id) then
-            if lostSource and change > 0 then change = -change end
+            -- quantityChange is always positive; only a loss reason without a gain source makes it a loss
+            if lostSource ~= nil and gainSource == nil and change > 0 then change = -change end
             CI:StartFlash(id, change)
         end
         CI:QueueRefresh()
