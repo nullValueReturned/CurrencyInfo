@@ -1,0 +1,10 @@
+package-as: CurrencyInfo
+
+enable-nolib-creation: no
+
+ignore:
+  - .github
+  - .vscode
+  - .claude
+  - .gitignore
+  - README.md
