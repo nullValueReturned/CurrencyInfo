@@ -2,7 +2,7 @@
 -- Core display logic
 
 local ADDON_NAME, ns = ...
-local VERSION = "1.1.0"
+local VERSION = (C_AddOns.GetAddOnMetadata(ADDON_NAME, "Version") or "dev"):gsub("^v", "")
 
 -- ============================================================
 -- Shared Constants (used by Config too)
